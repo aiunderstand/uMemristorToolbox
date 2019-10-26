@@ -5,22 +5,7 @@
  * Author : Steven Bos, Richard Anthony
  */ 
 
-
-/* 2do: 
- - brightness, maybe do use 10k resistor and play with read speed / refresh rate? https://www.instructables.com/community/In-an-arduino-controlled-led-matrix-can-you-contr/
- - serial interface to unity (receive only)
- 
-//void DisplayMatrixLED() {
-	//what is better version displaymatrix2 , displaymatrix1 or https://www.allaboutcircuits.com/technical-articles/driving-led-arrays-with-an-arduino/
-		//for (int i=0;i<8;i++)
-		//{
-			//PORTA = ~PORT[i];    //ground the PORTC pin
-			//PORTC = ALPHA[i];  //power the PORTA 
-			//_delay_ms(1);
-			//PORTA = PORT[i];     //clear pin after 1msec
-		//}
-//}
- 
+/* 
  * OUTPUT: COLUMNS port C 0-7 (arduino pins digital 30-37) and ROWS port A (arduino pins digital 22-29) for 8x8 LED matrix with following mapping:
  * https://circuitdigest.com/fullimage?i=circuitdiagram_mic/ATmega8-LED-Matrix-Circuit.gif
  * http://cool-web.de/raspberry/mit-zwei-74hc595-und-drei-steuerleitungen-8x8-led-matrix-ansteuern.htm
@@ -98,8 +83,17 @@
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
-#include <util/delay.h>
+
 #define F_CPU 1000000UL
+#include <util/delay.h>
+
+#include <string.h>
+#define CR 0x0D
+#define LF 0x0A 
+#define CS 0x2C //ASCII 44: the commma ',' as seperation symbol in serial message
+#define SS 0x24 //ASCII 44: the dollar '$' as start symbol in serial message
+#define ES 0x3B //ASCII 44: the semicolon ';' as terminal symbol in serial message
+
 
 //DEFINE MACRO's
 /* https://www.electro-tech-online.com/threads/defining-and-using-bit-flags-in-c.140777/ */
@@ -123,15 +117,20 @@ typedef unsigned char bool;
 #define KeypadMaskColumn2 0b00000010
 #define KeypadMaskColumn3 0b00000001
 
-#define NoKey	0xFF
+#define NoKey 0xFF
 
-#define LED_RED 0b00001000;
-#define LED_GREEN 0b00011000;
+#define LED_RED 0b00001000
+#define LED_GREEN 0b00011000
 
 volatile bool useExternalMatrix;
 volatile bool showPixel;
 volatile int frameId = 0;
 volatile int reducedBrightness = 3; //light up LED every n frame (causes flickering)
+
+#define MAXSIZE 10 //typical format is = "$0,16,27;" - "startsymbol, messagetypeId, position, value, end symbol" so 9 char's
+char inboundMsg[MAXSIZE];
+volatile bool msgCompleted = FALSE;
+volatile unsigned char msgCaret =0; // used for inboudMsg
 
 char data[8][8] = {
 					{0,0,0,0,0,0,0,0},
@@ -143,6 +142,23 @@ char data[8][8] = {
 					{0,0,2,2,2,2,0,0},
 					{0,0,0,0,0,0,0,0}
 				  };
+
+void Setup(void);
+unsigned char ScanKeypad(void);
+unsigned char ScanColumns(unsigned char);
+void DisplayKeyValue(unsigned char);
+void DebounceDelay(void);
+
+void ClearMatrix(void);
+void UpdateMatrix(int, int,int);
+void ToggleState(void);
+void DisplayLED(void);
+void Refresh(void);
+
+void USART0_TX_SingleByte(unsigned char);
+void USART0_TX_String(char*);
+int atoi(char *);
+void MessageProcessed(void);
 
 void ClearMatrix()
 {
@@ -209,13 +225,68 @@ void Setup()
 	
 	ClearMatrix();
 	
+	//setup serial connection assuming 9600 Baud rate and 1Mhz clock
+	
+	//UCSR0A – USART Control and Status Register A
+	// bit 7 RXC Receive Complete (flag)
+	// bit 6 TXC Transmit Complete (flag)
+	// bit 5 UDRE Data Register Empty (flag)
+	// bit 4 FE Frame Error (flag) - programmatically clear this when writing to UCSRA
+	// bit 3 DOR Data OverRun (flag)
+	// bit 2 PE Parity Error
+	// bit 1 UX2 Double the USART TX speed (but also depends on value loaded into the Baud Rate Registers)
+	// bit 0 MPCM Multi-Processor Communication Mode
+	UCSR0A = 0b00000010; // Set U2X (Double the USART Tx speed, to reduce clocking error)
+
+// UCSR0B - USART Control and Status Register B
+	// bit 7 RXCIE Receive Complete Interrupt Enable
+	// bit 6 TXCIE Transmit Complete Interrupt Enable
+	// bit 5 UDRIE Data Register Empty Interrupt Enable
+	// bit 4 RXEN Receiver Enable
+	// bit 3 TXEN Transmitter Enable
+	// bit 2 UCSZ2 Character Size (see also UCSZ1:0 in UCSRC)
+	// 0 = 5,6,7 or 8-bit data
+	// 1 = 9-bit data
+	// bit 1 RXB8 RX Data bit 8 (only for 9-bit data)
+	// bit 0 TXB8 TX Data bit 8 (only for 9-bit data)
+	UCSR0B = 0b10011000;  // RX Complete Int Enable, RX Enable, TX Enable, 8-bit data
+
+// UCSR0C - USART Control and Status Register C
+// *** This register shares the same I/O location as UBRRH ***
+	// Bits 7:6 – UMSELn1:0 USART Mode Select (00 = Asynchronous)
+	// bit 5:4 UPM1:0 Parity Mode
+	// 00 Disabled
+	// 10 Even parity
+	// 11 Odd parity
+	// bit 3 USBS Stop Bit Select
+	// 0 = 1 stop bit
+	// 1 = 2 stop bits
+	// bit 2:1 UCSZ1:0 Character Size (see also UCSZ2 in UCSRB)
+	// 00 = 5-bit data (UCSZ2 = 0)
+	// 01 = 6-bit data (UCSZ2 = 0)
+	// 10 = 7-bit data (UCSZ2 = 0)
+	// 11 = 8-bit data (UCSZ2 = 0)
+	// 11 = 9-bit data (UCSZ2 = 1)
+	// bit 0 UCPOL Clock POLarity
+	// 0 Rising XCK edge
+	// 1 Falling XCK edge
+	UCSR0C = 0b00000111;		// Asynchronous, No Parity, 1 stop, 8-bit data, Falling XCK edge
+
+// UBRR0 - USART Baud Rate Register (16-bit register, comprising UBRR0H and UBRR0L)
+	UBRR0H = 0; // 9600 baud, UBRR = 12, and  U2X must be set to '1' in UCSRA
+	UBRR0L = 12;
+	
 	sei();
 }
 
 void ToggleState(){
+	ClearMatrix();
+	msgCompleted = FALSE;
+
 	if (useExternalMatrix == FALSE)
 	{
 		useExternalMatrix = TRUE;
+		USART0_TX_String("reset");
 	}
 	else
 	{
@@ -274,15 +345,30 @@ unsigned char ScanColumns(unsigned char RowWeight)
 
 void DisplayKeyValue(unsigned char KeyValue)
 {
-	//convert from decimal to x,y
-	int y = (KeyValue-1) % 4;
-	int x = (KeyValue - y) / 4;
+	if (useExternalMatrix == FALSE)
+	{
+		//convert from decimal to x,y
+		int y = (KeyValue-1) % 4;
+		int x = (KeyValue - y) / 4;
 	
-	//retrieve current value and add 1. If > 2, reset to 0
-	int value = data[x*2][y*2] +1;
-	value = value %3;
+		//retrieve current value and add 1. If > 2, reset to 0
+		int value = data[x*2][y*2] +1;
+		value = value %3;
 	
-	UpdateMatrix(x,y,value);
+		UpdateMatrix(x,y,value);
+	}
+	else
+	{
+		//Convert unsigned char single digit numeric to ASCII char
+		char msg[2];
+	
+		msg[0] = KeyValue / 10 + 0x30;
+		msg[1] = KeyValue % 10 + 0x30;
+		msg[2] = '\0';
+		
+		//Send to PC
+		USART0_TX_String(msg);
+	}
 }
 
 unsigned char ScanKeypad()
@@ -324,6 +410,45 @@ unsigned char ScanKeypad()
 	return KeyValue;
 }
 
+ISR(USART0_RX_vect) // (USART_RX_Complete_Handler) USART Receive-Complete Interrupt Handler
+{
+	char cData = UDR0;
+	
+	switch(cData)
+	{
+		case SS:
+			msgCaret = 0;
+		break;
+		case ES:
+			msgCompleted = TRUE;
+		break;
+		default:
+			inboundMsg[msgCaret] = cData;
+			msgCaret++;
+		break;
+	}
+}
+
+void USART0_TX_SingleByte(unsigned char cByte)
+{
+	while(!(UCSR0A & (1 << UDRE0)));	// Wait for Tx Buffer to become empty (check UDRE flag)
+	UDR0 = cByte;	// Writing to the UDR transmit buffer causes the byte to be transmitted
+}
+
+void USART0_TX_String(char* sData)
+{
+	int iCount;
+	int iStrlen = strlen(sData);
+	if(0 != iStrlen)
+	{
+		for(iCount = 0; iCount < iStrlen; iCount++)
+		{
+			USART0_TX_SingleByte(sData[iCount]);
+		}
+		USART0_TX_SingleByte(CR);
+		USART0_TX_SingleByte(LF);
+	}
+}
 
 void Refresh() {
 	
@@ -375,10 +500,21 @@ void Refresh() {
 		
 			sbi(PORTA,i);
 			//_delay_ms(1);
-			_delay_us(250);			
+			_delay_us(250);
+			//DebounceDelay();			
 		}
 		
 		frameId++;
+}
+
+void MessageProcessed(){
+
+	msgCompleted = FALSE;
+
+	for (int i = 0; i < sizeof(inboundMsg); i++)
+	{
+		inboundMsg[i] = 0;	
+	}
 }
 
 int main(void)
@@ -389,6 +525,47 @@ int main(void)
 	
     while (1) 
     {
+		//scan for inbound messages ready for parsing
+		if(msgCompleted == TRUE && useExternalMatrix == TRUE)
+		{
+			int messageType = -1;
+			int id = -1;
+			int value = -1;
+			char * strtokIndx; // this is used by strtok() as an index, see http://www.cplusplus.com/reference/cstring/strtok/
+			strtokIndx = strtok(inboundMsg,",");
+			
+			while (strtokIndx != NULL)
+			{
+				if (messageType == -1)
+				{
+					messageType = atoi(strtokIndx);
+					strtokIndx = strtok(NULL,",");     
+				}
+				else
+				{
+					if (id == -1)
+					{
+						id = atoi(strtokIndx);
+						strtokIndx = strtok(NULL,",");     
+					}
+					else
+					{
+						value = atoi(strtokIndx);
+						strtokIndx = NULL;
+					}
+				}
+			}
+			
+			//convert id into x,y
+			int y = (id-1) % 4;
+			int x = (id - y) / 4;
+			
+			UpdateMatrix(x,y,value);
+			
+			MessageProcessed();			
+		}
+		
+		
 		//scan for button press, interupt might be better
 		if(PINE & 0b00010000) 
 		{
