@@ -22,7 +22,7 @@ public class OutputController : MonoBehaviour
             leds.Add(allLeds[i]);
         }
     }
-    
+
     public void Update()
     {
         delayTime += Time.deltaTime;

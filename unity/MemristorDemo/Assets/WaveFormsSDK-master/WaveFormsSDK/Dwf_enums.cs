@@ -36,8 +36,8 @@ namespace WaveFormsSDK
             }
             return r;
         }
-
-		// ========================================================================================
+        
+        // ========================================================================================
         static List<ACQMODE> AcqmodesOfBitfield(int bf)
         {
             var r = new List<ACQMODE>();
@@ -51,8 +51,8 @@ namespace WaveFormsSDK
             }
             return r;
         }
-
-		// ========================================================================================
+        
+        // ========================================================================================
         static List<FILTER> FiltersOfBitfield(int bf)
         {
             var r = new List<FILTER>();
@@ -232,5 +232,20 @@ namespace WaveFormsSDK
             return r;
         }
 
-		}
+        public static void SetPowerSupply(int hdwf, int idxChannel, double value)
+        {
+            //https://forum.digilentinc.com/topic/5412-analog-discovery-2-power-supply-sdk-api/
+            Dwf.AnalogIOChannelNodeSet(hdwf, idxChannel, 0, 1);     //node 0= enable (set to 1 = true)
+            Dwf.AnalogIOChannelNodeSet(hdwf, idxChannel, 1, value); //node 1= voltage (set to value)
+            Dwf.AnalogIOEnableSet(hdwf, true);
+            Dwf.AnalogIOConfigure(hdwf);
+        }
+
+        public static uint GetDigitalIOStatus(int hdwf)
+        {
+            Dwf.DigitalIOStatus(hdwf);
+            return Dwf.DigitalIOInputStatus(hdwf);
+        }
+
+    }
 }

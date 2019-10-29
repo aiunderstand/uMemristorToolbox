@@ -452,6 +452,18 @@ namespace WaveFormsSDK
         Zet      = 3,
     }
 
+    //added from https://www.mvndoc.com/c/org.knowm/waveforms4j/constant-values.html#org.knowm.waveforms4j.DWF.WAVEFORM_CHANNEL_1
+    //waveform, oscilloscope, analogio channels.
+    public enum CHANNELS : int {
+        CHANNEL_1  = 0,
+        CHANNEL_2  = 1,
+        CHANNEL_BOTH = -1
+    }
+
+    public enum AD2 : int {
+        MAX_BUFFER_SIZE = 8192
+    }
+
     /// <summary>
     /// Device id and version.
     /// </summary>
@@ -653,7 +665,7 @@ namespace WaveFormsSDK
         delegate bool FuncHdwfIndexNodeGetRangeSteps<Tnode, Tminmax, Tsteps>(HDWF hdwf, int index, Tnode node, ref Tminmax tMin, ref Tminmax tMax, ref Tsteps tSteps)
             where Tminmax : new()
             where Tsteps : new();
-
+        
 
         // ========================================================================================
         /// <summary>

@@ -23,6 +23,7 @@ public class InputController : MonoBehaviour
 
         //init Serial connection
         SerialController.Init();
+        MemristorController.Init();
     }
 
     public void Update()
@@ -69,6 +70,26 @@ public class InputController : MonoBehaviour
         MemristorController.Send(id, buttonText.text);
     }
 
+    public void OnToggle(bool status)
+    {
+        MemristorController.ToggleMemristor(0, status);
+    }
+
+    public void OnToggle5(bool status)
+    {
+        MemristorController.ToggleMemristor(5, status);
+    }
+
+    public void OnToggle15(bool status)
+    {
+        MemristorController.ToggleMemristor(15, status);
+    }
+
+    public void Test()
+    {
+        MemristorController.CheckerboardExperiment();
+    }
+
     public void Reset()
     {
         for (int i = 0; i < buttons.Count; i++)
@@ -80,5 +101,6 @@ public class InputController : MonoBehaviour
     private void OnApplicationQuit()
     {
         SerialController.Close();
+        MemristorController.Close();
     }
 }
