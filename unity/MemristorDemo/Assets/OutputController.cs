@@ -7,7 +7,7 @@ using static SerialController;
 
 public class OutputController : MonoBehaviour
 {
-    List<Button> leds = new List<Button>();
+    List<Button> memristors = new List<Button>();
     float delayTime = 0;
     float delay = 0.05f;
 
@@ -19,9 +19,57 @@ public class OutputController : MonoBehaviour
 
         for (int i = 0; i < allLeds.Length; i++)
         {
-            leds.Add(allLeds[i]);
+            memristors.Add(allLeds[i]);
         }
     }
+
+    public void Start()
+    {
+        MemristorController.Output.Enqueue("1,2");
+        MemristorController.Output.Enqueue("2,2");
+        MemristorController.Output.Enqueue("3,2");
+        MemristorController.Output.Enqueue("4,2");
+
+        MemristorController.Output.Enqueue("5,1");
+        MemristorController.Output.Enqueue("6,1");
+        MemristorController.Output.Enqueue("7,1");
+        MemristorController.Output.Enqueue("8,1");
+
+        MemristorController.Output.Enqueue("9,2");
+        MemristorController.Output.Enqueue("10,2");
+        MemristorController.Output.Enqueue("11,2");
+        MemristorController.Output.Enqueue("12,2");
+
+        MemristorController.Output.Enqueue("13,1");
+        MemristorController.Output.Enqueue("14,1");
+        MemristorController.Output.Enqueue("15,1");
+        MemristorController.Output.Enqueue("16,1");
+    }
+
+    public void OnButtonPressed(int id)
+    {
+        //get selected button, -1 for index start at 1
+        var button = memristors[id - 1];
+
+        //get textcomponent of button
+        var buttonText = button.GetComponentInChildren<TextMeshProUGUI>();
+
+
+        //toggle enabled state by putting a - sign in label
+        if (buttonText.text.Equals("-"))
+        {
+            //send a clear signal to memristor
+            MemristorController.ToggleMemristor(id, true);
+            //MemristorController.Read(id, buttonText.text);            
+        }
+        else
+        {
+            MemristorController.ToggleMemristor(id, false);
+            MemristorController.Output.Enqueue(string.Format("{0},-1", id.ToString()));
+        }
+
+        
+    } 
 
     public void Update()
     {
@@ -44,11 +92,24 @@ public class OutputController : MonoBehaviour
                     var value = parts[1];
 
                     //update Memristor Output UI
-                    var led = leds[id - 1].GetComponentInChildren<TextMeshProUGUI>();
-                    led.text = value;
+                    var led = memristors[id - 1].GetComponentInChildren<TextMeshProUGUI>();
 
-                    //update Hardware LEDs
-                    SerialController.Send(string.Format("${0},{1},{2};", (int)MessageType.UpdateMatrixSingle, id, value));
+                    //enable or disable using memristor
+                    if (!value.Contains("-1"))
+                    {
+                        led.text = value;
+
+                        //update Hardware LEDs
+                        SerialController.Send(string.Format("${0},{1},{2};", (int)MessageType.UpdateMatrixSingle, id, value));
+                    }
+                    else
+                    {
+                        led.text = "-";
+                        value = "0";
+
+                        //update Hardware LEDs
+                        SerialController.Send(string.Format("${0},{1},{2};", (int)MessageType.UpdateMatrixSingle, id, value));
+                    }
                 }
             }
         }

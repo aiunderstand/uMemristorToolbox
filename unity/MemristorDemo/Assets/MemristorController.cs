@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Text;
 using System.Threading;
 using UnityEngine;
@@ -32,18 +33,25 @@ public class MemristorController
 
     //added from checkerboard experiment class
     private static float V_READ = .1f;
-    private static float V_WRITE = 1f;
-    private static float V_RESET = -2f;
+    private static float V_WRITE = 1f; //2
+    //private static float V_WRITE1 = 0.5f; //1
+    private static float V_RESET = -2f; //0
     //private static float MIN_DEVIATION = .03F; // Line trace resistance, AD2 Calibration. [AIU] NOT USED?
     private static int PULSE_WIDTH_IN_MICRO_SECONDS = 50_000;
     private static float MIN_Q = 2; // minimum ratio between erase/write resistance
     private static float MEMINLINE_MIN_R = 10; // if all states are below this (kiloohms), its stuck low
     private static float MEMINLINE_MAX_R = 100; // if all state are above this (kilohms), its stuck low
+
+    public static void OneTritADCExperiment()
+    {
+        throw new NotImplementedException();
+    }
+
     private static float MEMINLINE_MIN_SWITCH_OFF = 1000; // if switch is below this resistance (kOhm) when OFF then its a bad switch
     private static int meminline_numFailed = 0;
     private static int COL_WIDTH = 10;
     public static float MIN_VOLTAGE_MEASURE_AMPLITUDE = .005f;
-    public static int SERIES_RESISTANCE = 10000; //ohm, should this be 5000 with 2 10K resistors pluged in?
+    public static int SERIES_RESISTANCE = 10000; //ohm, series resistor, so 2 x 5k ohm
 
     public enum Waveform
     {
@@ -160,6 +168,7 @@ public class MemristorController
 
             AppendWhiteSpace(s, b, COL_WIDTH);
 
+
             b.Append("|");
         }
         return b.ToString();
@@ -176,14 +185,14 @@ public class MemristorController
     }
 
     public static void CheckerboardExperiment() {
+        var date = DateTime.Today.ToShortDateString();
+        var time = DateTime.Now.ToShortTimeString();
+
         //HEADER
-        Debug.Log("NOTE: V2 board must be in Mode 1");
-        Debug.Log("Mem-Inline Chip Test");
-        Debug.Log("");
-        Debug.Log("V_WRITE: " + V_WRITE + "V");
-        Debug.Log("V_RESET: " + V_RESET + "V");
-        Debug.Log("V_READ: " + V_READ + "V");
-        Debug.Log("");
+        var experiment = "Checkerboard experiment";
+        var settings = string.Format("DATE: {0}  TIME: {5} V_WRITE: {1}v  V_RESET: {2}v  V_READ {3}v  SERIES_RES {4}Ω", date, V_WRITE, V_RESET, V_READ, SERIES_RESISTANCE, time);
+        Logger.dataQueue.Add(experiment);
+        Logger.dataQueue.Add(settings);
 
         int n = 17;
 
@@ -199,21 +208,17 @@ public class MemristorController
             AppendWhiteSpace(w, b, COL_WIDTH + 1);
         }
 
-        Debug.Log("");
-
-
         //LOGIC
-        float[][] reads;
+        float[][] reads = null;
 
         // form device
         reads = PulseUtility.TestMeminline(Waveform.HalfSine, -V_WRITE, -V_RESET, -V_READ, PULSE_WIDTH_IN_MICRO_SECONDS, PULSE_WIDTH_IN_MICRO_SECONDS, PULSE_WIDTH_IN_MICRO_SECONDS);
-        Debug.Log(FormatResistanceArray("ERASE       ", reads[0]));
-        Debug.Log(FormatResistanceArray("WRITE       ", reads[1]));
-        Debug.Log(FormatResistanceArray("ERASE      ", reads[2]));
+        Logger.dataQueue.Add(FormatResistanceArray("ERASE       ", reads[0]));
+        Logger.dataQueue.Add(FormatResistanceArray("WRITE       ", reads[1]));
+        Logger.dataQueue.Add(FormatResistanceArray("ERASE      ", reads[2]));
+        Logger.dataQueue.Add("RESULT      " + VerifyMemInlineReads(reads));
 
-        Debug.Log("RESULT      " + VerifyMemInlineReads(reads));
-        Debug.Log("");
-
+        
         bool pulseCaptureFail = false;
         for (int i = 0; i < reads.Length; i++)
         {
@@ -227,31 +232,69 @@ public class MemristorController
         }
         if (pulseCaptureFail)
         {
-            Debug.Log("PULSE CAPTURE FAILURE");
-            return;
+            Logger.dataQueue.Add("PULSE CAPTURE FAILURE");            
         }
 
         if (meminline_numFailed == 0)
         {
-            Debug.Log("TIER 1");
+            Logger.dataQueue.Add("TIER 1");            
         }
         else if (meminline_numFailed <= 2)
         {
-            Debug.Log("TIER 2");
+            Logger.dataQueue.Add("TIER 2");
         }
         else if (meminline_numFailed <= 4)
         {
-            Debug.Log("BURN AND LEARN");
+            Logger.dataQueue.Add("BURN AND LEARN");
         }
         else
         {
-            Debug.Log("REJECT");
+            Logger.dataQueue.Add("REJECT");
         }
 
         if (meminline_numFailed > 3)
-            Debug.Log("NOTE: Is board in mode 2?");
-       
+            Logger.dataQueue.Add("NOTE: Is board in mode 2 ? ");
+        
+
+
+        Debug.Log("NOTE: V2 board must be in Mode 1");
+        Logger.SaveExperimentDataToLog();
     }
+
+    public static void ReadTestExperiment()
+    {
+        var date = DateTime.Today.ToShortDateString();
+        var time = DateTime.Now.ToShortTimeString();
+
+        //HEADER
+        var experiment = "Read test experiment";
+        var settings = string.Format("DATE: {0}  TIME: {5} V_WRITE: {1}v  V_RESET: {2}v  V_READ {3}v  SERIES_RES {4}Ω", date, V_WRITE, V_RESET, V_READ, SERIES_RESISTANCE, time);
+        Logger.dataQueue.Add(experiment);
+        Logger.dataQueue.Add(settings);
+        
+        // form device        
+        PulseUtility.ReadExperiment(Waveform.Square, Waveform.HalfSine, -V_WRITE, -V_RESET, -V_READ, PULSE_WIDTH_IN_MICRO_SECONDS, PULSE_WIDTH_IN_MICRO_SECONDS, PULSE_WIDTH_IN_MICRO_SECONDS);
+
+        Logger.SaveExperimentDataToLog();
+    }
+
+    public static void ReadTestAfterDisconnectExperiment()
+    {
+        var date = DateTime.Today.ToShortDateString();
+        var time = DateTime.Now.ToShortTimeString();
+
+        //HEADER
+        var experiment = "Read test after disconnect experiment";
+        var settings = string.Format("DATE: {0}  TIME: {5} V_WRITE: {1}v  V_RESET: {2}v  V_READ {3}v  SERIES_RES {4}Ω", date, V_WRITE, V_RESET, V_READ, SERIES_RESISTANCE, time);
+        Logger.dataQueue.Add(experiment);
+        Logger.dataQueue.Add(settings);
+
+        // form device        
+        PulseUtility.ReadAfterDisconnectExperiment(Waveform.Square, Waveform.HalfSine, -V_WRITE, -V_RESET, -V_READ, PULSE_WIDTH_IN_MICRO_SECONDS, PULSE_WIDTH_IN_MICRO_SECONDS, PULSE_WIDTH_IN_MICRO_SECONDS);
+
+        Logger.SaveExperimentDataToLog();
+    }
+
 
     public static void Read(int id)
     {

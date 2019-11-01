@@ -33,15 +33,12 @@ public class PulseUtility
      * measures starting resistance values writes devices, measure resistance values erase, measure resistance values returns array of resistance values
      * for each device (in kOhms): start, write, erase
      */
-
-    public static float[][] TestMeminline(
-        Waveform writeEraseWaveform,
-        float V_WRITE,
-        float V_ERASE,
-        float V_READ,
-        int READ_PULSE_WIDTH_IN_MICRO_SECONDS,
-        int WRITE_PULSE_WIDTH_IN_MICRO_SECONDS,
-        int ERASE_PULSE_WIDTH_IN_MICRO_SECONDS)
+    static int samplesPerPulse;
+    static int sampleFrequency;
+    static int samples;
+    static int readSamples = 10;
+    static int readDelay = 1000; //miliseconds
+    public static float[][] TestMeminline(Waveform writeEraseWaveform, float V_WRITE, float V_ERASE, float V_READ, int READ_PULSE_WIDTH_IN_MICRO_SECONDS, int WRITE_PULSE_WIDTH_IN_MICRO_SECONDS, int ERASE_PULSE_WIDTH_IN_MICRO_SECONDS)
     {
 
         try
@@ -62,13 +59,71 @@ public class PulseUtility
             measureAllSwitchResistances(writeEraseWaveform, V_ERASE, ERASE_PULSE_WIDTH_IN_MICRO_SECONDS);
             Thread.Sleep(25);
             reads[2] = measureAllSwitchResistances(Waveform.Square, V_READ, READ_PULSE_WIDTH_IN_MICRO_SECONDS);
+
+            Logger.dataQueue.Add(string.Format("Read Waveform {0}  WriteErase Waveform {1}  samples per pulse {2}  sampleFrequency {3}  samples{4}", Waveform.Square.ToString(), Waveform.HalfSine.ToString(),samplesPerPulse,sampleFrequency,samples));
+
             return reads;
+
+
         }
         catch (Exception)
         {
             return null;
         }
     }
+
+    public static void ReadExperiment(Waveform readWaveform, Waveform writeEraseWaveform, float V_WRITE, float V_ERASE, float V_READ, int READ_PULSE_WIDTH_IN_MICRO_SECONDS, int WRITE_PULSE_WIDTH_IN_MICRO_SECONDS, int ERASE_PULSE_WIDTH_IN_MICRO_SECONDS)
+    {
+        try
+        {
+            float[][] reads = new float[1][];
+
+            //1 erase
+            measureAllSwitchResistances(writeEraseWaveform, V_ERASE, ERASE_PULSE_WIDTH_IN_MICRO_SECONDS);
+            Thread.Sleep(25);
+
+            //1 write
+            measureAllSwitchResistances(writeEraseWaveform, V_WRITE, WRITE_PULSE_WIDTH_IN_MICRO_SECONDS);
+            Thread.Sleep(25);
+
+            //n reads
+            for (int i = 0; i < readSamples; i++)
+            {
+                reads[0] = measureAllSwitchResistances(readWaveform, V_READ, READ_PULSE_WIDTH_IN_MICRO_SECONDS);
+                Logger.dataQueue.Add(FormatResistanceArray("READ      ", reads[0]));
+                Thread.Sleep(readDelay);
+
+            }
+            reads[0] = measureAllSwitchResistances(readWaveform, V_READ, READ_PULSE_WIDTH_IN_MICRO_SECONDS);
+            Logger.dataQueue.Add(string.Format("Read Waveform {0}  WriteErase Waveform {1}  samples per pulse {2}  sampleFrequency {3}  samples{4}", readWaveform.ToString(), writeEraseWaveform.ToString(), samplesPerPulse, sampleFrequency, samples));            
+        }
+        catch (Exception)
+        {            
+        }
+    }
+
+    public static void ReadAfterDisconnectExperiment(Waveform readWaveform, Waveform writeEraseWaveform, float V_WRITE, float V_ERASE, float V_READ, int READ_PULSE_WIDTH_IN_MICRO_SECONDS, int WRITE_PULSE_WIDTH_IN_MICRO_SECONDS, int ERASE_PULSE_WIDTH_IN_MICRO_SECONDS)
+    {
+        try
+        {
+            float[][] reads = new float[1][];
+
+            //n reads
+            for (int i = 0; i < readSamples; i++)
+            {
+                reads[0] = measureAllSwitchResistances(readWaveform, V_READ, READ_PULSE_WIDTH_IN_MICRO_SECONDS);
+                Logger.dataQueue.Add(FormatResistanceArray("READ      ", reads[0]));
+                Thread.Sleep(readDelay);
+
+            }
+            reads[0] = measureAllSwitchResistances(readWaveform, V_READ, READ_PULSE_WIDTH_IN_MICRO_SECONDS);
+            Logger.dataQueue.Add(string.Format("Read Waveform {0}  WriteErase Waveform {1}  samples per pulse {2}  sampleFrequency {3}  samples{4}", readWaveform.ToString(), writeEraseWaveform.ToString(), samplesPerPulse, sampleFrequency, samples));
+        }
+        catch (Exception)
+        {
+        }
+    }
+
 
     public static float[] measureAllSwitchResistances(
         Waveform waveform, float readVoltage, int pulseWidthInMicroSeconds)
@@ -126,9 +181,9 @@ public class PulseUtility
     public static float[] getScopesAverageVoltage(
         Waveform waveform, float readVoltage, int pulseWidthInMicroSeconds, int dWFWaveformChannel)
     {
-        int samplesPerPulse = 300;
-        int sampleFrequency = (int)(1.0 / (pulseWidthInMicroSeconds * 2 * 1E-6));
-        int samples = sampleFrequency * samplesPerPulse;
+        samplesPerPulse = 300;
+        sampleFrequency = (int)(1.0 / (pulseWidthInMicroSeconds * 2 * 1E-6));
+        samples = sampleFrequency * samplesPerPulse;
 
         MemristorController.StartAnalogCaptureBothChannelsTriggerOnWaveformGenerator(dWFWaveformChannel, samples, samplesPerPulse, true);
         MemristorController.WaitUntilArmed();

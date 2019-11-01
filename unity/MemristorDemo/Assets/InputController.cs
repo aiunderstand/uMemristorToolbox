@@ -8,9 +8,10 @@ public class InputController : MonoBehaviour
 {
     List<Button> buttons = new List<Button>();
 
-    [Range(3, 9)]
-    public int maxTritValue;
-    
+    int maxTritValue =3;
+
+    public TMP_Dropdown experimentSelector;
+
     public void Awake()
     {
         //add buttons to list, assume same order as in UI
@@ -70,24 +71,24 @@ public class InputController : MonoBehaviour
         MemristorController.Send(id, buttonText.text);
     }
 
-    public void OnToggle(bool status)
+    public void StartExperiment()
     {
-        MemristorController.ToggleMemristor(0, status);
-    }
+        //read dropdown
+        var index = experimentSelector.value;
 
-    public void OnToggle5(bool status)
-    {
-        MemristorController.ToggleMemristor(5, status);
-    }
-
-    public void OnToggle15(bool status)
-    {
-        MemristorController.ToggleMemristor(15, status);
-    }
-
-    public void Test()
-    {
-        MemristorController.CheckerboardExperiment();
+        switch (index)
+        {
+            case 0:
+                MemristorController.CheckerboardExperiment();
+                break;
+            case 1:
+                MemristorController.ReadTestExperiment();
+                break;
+            case 2:
+                MemristorController.ReadTestAfterDisconnectExperiment();
+                break;
+        }
+        
     }
 
     public void Reset()
