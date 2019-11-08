@@ -25,25 +25,25 @@ public class OutputController : MonoBehaviour
 
     public void Start()
     {
-        MemristorController.Output.Enqueue("1,2");
-        MemristorController.Output.Enqueue("2,2");
-        MemristorController.Output.Enqueue("3,2");
-        MemristorController.Output.Enqueue("4,2");
+        //MemristorController.Output.Enqueue("1,2");
+        //MemristorController.Output.Enqueue("2,2");
+        //MemristorController.Output.Enqueue("3,2");
+        //MemristorController.Output.Enqueue("4,2");
 
-        MemristorController.Output.Enqueue("5,1");
-        MemristorController.Output.Enqueue("6,1");
-        MemristorController.Output.Enqueue("7,1");
-        MemristorController.Output.Enqueue("8,1");
+        //MemristorController.Output.Enqueue("5,1");
+        //MemristorController.Output.Enqueue("6,1");
+        //MemristorController.Output.Enqueue("7,1");
+        //MemristorController.Output.Enqueue("8,1");
 
-        MemristorController.Output.Enqueue("9,2");
-        MemristorController.Output.Enqueue("10,2");
-        MemristorController.Output.Enqueue("11,2");
-        MemristorController.Output.Enqueue("12,2");
+        //MemristorController.Output.Enqueue("9,2");
+        //MemristorController.Output.Enqueue("10,2");
+        //MemristorController.Output.Enqueue("11,2");
+        //MemristorController.Output.Enqueue("12,2");
 
-        MemristorController.Output.Enqueue("13,1");
-        MemristorController.Output.Enqueue("14,1");
-        MemristorController.Output.Enqueue("15,1");
-        MemristorController.Output.Enqueue("16,1");
+        //MemristorController.Output.Enqueue("13,1");
+        //MemristorController.Output.Enqueue("14,1");
+        //MemristorController.Output.Enqueue("15,1");
+        //MemristorController.Output.Enqueue("16,1");
     }
 
     public void OnButtonPressed(int id)

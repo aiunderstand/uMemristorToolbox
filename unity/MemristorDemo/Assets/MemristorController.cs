@@ -295,6 +295,22 @@ public class MemristorController
         Logger.SaveExperimentDataToLog();
     }
 
+    public static void DCExperiment()
+    {
+        var date = DateTime.Today.ToShortDateString();
+        var time = DateTime.Now.ToShortTimeString();
+
+        //HEADER
+        var experiment = "Read test after disconnect experiment";
+        var settings = string.Format("DATE: {0}  TIME: {5} V_WRITE: {1}v  V_RESET: {2}v  V_READ {3}v  SERIES_RES {4}Ω", date, V_WRITE, V_RESET, V_READ, SERIES_RESISTANCE, time);
+        Logger.dataQueue.Add(experiment);
+        Logger.dataQueue.Add(settings);
+
+        // form device        
+        PulseUtility.ReadAfterDisconnectExperiment(Waveform.Square, Waveform.HalfSine, -V_WRITE, -V_RESET, -V_READ, PULSE_WIDTH_IN_MICRO_SECONDS, PULSE_WIDTH_IN_MICRO_SECONDS, PULSE_WIDTH_IN_MICRO_SECONDS);
+
+        Logger.SaveExperimentDataToLog();
+    }
 
     public static void Read(int id)
     {

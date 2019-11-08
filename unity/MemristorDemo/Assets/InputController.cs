@@ -10,8 +10,8 @@ public class InputController : MonoBehaviour
 
     int maxTritValue =3;
 
-    public TMP_Dropdown experimentSelector;
-
+   
+    
     public void Awake()
     {
         //add buttons to list, assume same order as in UI
@@ -21,10 +21,6 @@ public class InputController : MonoBehaviour
         {
             buttons.Add(allButtons[i]);
         }
-
-        //init Serial connection
-        SerialController.Init();
-        MemristorController.Init();
     }
 
     public void Update()
@@ -52,6 +48,7 @@ public class InputController : MonoBehaviour
         }
         
     }
+
     public void OnButtonPressed(int id)
     {
         //get selected button, -1 for index start at 1
@@ -71,37 +68,12 @@ public class InputController : MonoBehaviour
         MemristorController.Send(id, buttonText.text);
     }
 
-    public void StartExperiment()
-    {
-        //read dropdown
-        var index = experimentSelector.value;
-
-        switch (index)
-        {
-            case 0:
-                MemristorController.CheckerboardExperiment();
-                break;
-            case 1:
-                MemristorController.ReadTestExperiment();
-                break;
-            case 2:
-                MemristorController.ReadTestAfterDisconnectExperiment();
-                break;
-        }
-        
-    }
-
+  
     public void Reset()
     {
         for (int i = 0; i < buttons.Count; i++)
         {
             buttons[i].GetComponentInChildren<TextMeshProUGUI>().text ="0";
         }
-    }
-
-    private void OnApplicationQuit()
-    {
-        SerialController.Close();
-        MemristorController.Close();
     }
 }
