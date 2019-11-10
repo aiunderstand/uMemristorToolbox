@@ -15,11 +15,14 @@ public class ExperimentManager : MonoBehaviour
     }
 
     public TMP_Dropdown ExperimentSelector;
-
+    public bool simulateControllers = true;
     public void Awake()
     {
-        SerialController.Init();
-        MemristorController.Init();
+        if (!simulateControllers)
+        {
+            SerialController.Init();
+            MemristorController.Init();
+        }
     }
 
     public void StartExperiment()
@@ -49,7 +52,10 @@ public class ExperimentManager : MonoBehaviour
 
     private void OnApplicationQuit()
     {
-        SerialController.Close();
-        MemristorController.Close();
+        if (!simulateControllers)
+        {
+            SerialController.Close();
+            MemristorController.Close();
+        }
     }
 }
