@@ -36,6 +36,9 @@ public class WaveformUtils
             case Waveform.HalfSine:
                 driver = new HalfSine("HalfSine", 0, 0, amplitude, frequency);
                 break;
+            case Waveform.TriangleUpDown:
+                driver = new TriangleUpDown("TriangleUpDown", 0, 0, amplitude, frequency);
+                break;
             default:
                 driver = new Square("Square", amplitude / 2, 0, amplitude / 2, frequency); //default was sawtooth!
                 break;

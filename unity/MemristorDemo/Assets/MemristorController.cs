@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading;
 using UnityEngine;
 using WaveFormsSDK;
+using static ExperimentManager;
 
 //this class uses API from waveform4j https://www.mvndoc.com/c/org.knowm/waveforms4j/org/knowm/waveforms4j/DWF.html
 //https://github.com/knowm/waveforms4j/blob/e49747b722803ffd768a9cf990f6bdcb0e347b54/src/main/java/org/knowm/waveforms4j/DWF.java
@@ -41,22 +42,20 @@ public class MemristorController
     private static float MIN_Q = 2; // minimum ratio between erase/write resistance
     private static float MEMINLINE_MIN_R = 10; // if all states are below this (kiloohms), its stuck low
     private static float MEMINLINE_MAX_R = 100; // if all state are above this (kilohms), its stuck low
-
-    public static void OneTritADCExperiment()
-    {
-        throw new NotImplementedException();
-    }
-
     private static float MEMINLINE_MIN_SWITCH_OFF = 1000; // if switch is below this resistance (kOhm) when OFF then its a bad switch
     private static int meminline_numFailed = 0;
     private static int COL_WIDTH = 10;
     public static float MIN_VOLTAGE_MEASURE_AMPLITUDE = .005f;
     public static int SERIES_RESISTANCE = 10000; //ohm, series resistor, so 2 x 5k ohm
 
+    //REFACTOR model with shared properties. Refactor so that shared properties from pulseutility, this class are in model class
+    public static MemristorModel Model = new MemristorModel(); 
+
     public enum Waveform
     {
         Square,
-        HalfSine
+        HalfSine,
+        TriangleUpDown,
     }
 
     public static void Init()
@@ -301,15 +300,26 @@ public class MemristorController
         var time = DateTime.Now.ToShortTimeString();
 
         //HEADER
-        var experiment = "Read test after disconnect experiment";
-        var settings = string.Format("DATE: {0}  TIME: {5} V_WRITE: {1}v  V_RESET: {2}v  V_READ {3}v  SERIES_RES {4}Ω", date, V_WRITE, V_RESET, V_READ, SERIES_RESISTANCE, time);
+        var experiment = "DC Experiment";
+        var settings = string.Format("DATE: {0}  TIME: {1} SERIES_RES {2}Ω", date, time, SERIES_RESISTANCE);
         Logger.dataQueue.Add(experiment);
         Logger.dataQueue.Add(settings);
 
-        // form device        
-        PulseUtility.ReadAfterDisconnectExperiment(Waveform.Square, Waveform.HalfSine, -V_WRITE, -V_RESET, -V_READ, PULSE_WIDTH_IN_MICRO_SECONDS, PULSE_WIDTH_IN_MICRO_SECONDS, PULSE_WIDTH_IN_MICRO_SECONDS);
+        // form device (CURRENTLY ARGUMENTS ARE NOT USED, REFACTOR)   
+        //do all 16 memristors
+        for (int i = 0; i < 16; i++)
+        {
+            MemristorController.ToggleMemristor(i, true);
+            PulseUtility.DCExperiment(i, Waveform.Square, Waveform.HalfSine, -V_WRITE, -V_RESET, -V_READ, PULSE_WIDTH_IN_MICRO_SECONDS, PULSE_WIDTH_IN_MICRO_SECONDS, PULSE_WIDTH_IN_MICRO_SECONDS);
+            MemristorController.ToggleMemristor(i, false);
+        }
 
         Logger.SaveExperimentDataToLog();
+    }
+
+    public static void OneTritADCExperiment()
+    {
+        throw new NotImplementedException();
     }
 
     public static void Read(int id)
@@ -361,6 +371,17 @@ public class MemristorController
         // Device //////////////////////////////////////////////
         // ///////////////////////////////////////////////////////////
         Dwf.DeviceCloseAll();
+    }
+
+    public static void StopWave(int idxChannel)
+    {
+        Dwf.AnalogOutNodeOffsetSet(hdwf, idxChannel, ANALOGOUTNODE.Carrier,  0); // shouldn't need this in theory, but DC offset is always lingering (https://forum.digilentinc.com/topic/3465-waveforms-sdk-correctly-start-and-stop-analog-out/)
+        Dwf.AnalogOutConfigure(hdwf,idxChannel, false);
+    }
+
+    public static void StopAnalogCaptureBothChannels()
+    {
+        Dwf.AnalogInConfigure(hdwf,true, false);
     }
 
     public static void TurnOffAllSwitches()
@@ -483,6 +504,60 @@ public class MemristorController
             //}
             return true;
         }
+
+    public static bool StartAnalogCaptureBothChannelsLevelTrigger(double sampleFrequency, double triggerLevel, int bufferSize)
+    {
+        if (bufferSize > (int)AD2.MAX_BUFFER_SIZE)
+        {
+            // logger.error("Buffer size larger than allowed size. Setting to " + DWF.AD2_MAX_BUFFER_SIZE);
+            bufferSize = (int)AD2.MAX_BUFFER_SIZE;
+        }
+        
+        Dwf.AnalogInFrequencySet(hdwf, sampleFrequency);
+        Dwf.AnalogInBufferSizeSet(hdwf, bufferSize);
+        Dwf.AnalogInTriggerPositionSet(hdwf, (bufferSize / 2) / sampleFrequency); // no buffer prefill
+
+        Dwf.AnalogInChannelEnableSet(hdwf, (int)CHANNELS.CHANNEL_1, true);
+        Dwf.AnalogInChannelRangeSet(hdwf, (int)CHANNELS.CHANNEL_1, 2.5);
+        Dwf.AnalogInChannelEnableSet(hdwf, (int)CHANNELS.CHANNEL_2, true);
+        Dwf.AnalogInChannelRangeSet(hdwf, (int)CHANNELS.CHANNEL_2, 2.5);
+
+        Dwf.AnalogInAcquisitionModeSet(hdwf, ACQMODE.Single);
+
+        // Trigger single capture on rising edge of analog signal pulse
+        Dwf.AnalogInTriggerAutoTimeoutSet(hdwf, 0); // disable auto trigger
+        
+        Dwf.AnalogInTriggerSourceSet(hdwf, TRIGSRC.DetectorAnalogIn); // one of the analog in channels
+
+        Dwf.AnalogInTriggerTypeSet(hdwf, TRIGTYPE.Edge);
+        Dwf.AnalogInTriggerChannelSet(hdwf, 0); // first channel
+                                                             
+        // Trigger Level
+        if (triggerLevel > 0)
+        {
+            Dwf.AnalogInTriggerConditionSet(hdwf, TRIGCOND.RisingPositive);
+            Dwf.AnalogInTriggerLevelSet(hdwf,triggerLevel);
+        }
+        else
+        {
+            Dwf.AnalogInTriggerConditionSet(hdwf, TRIGCOND.FallingNegative);
+            Dwf.AnalogInTriggerLevelSet(hdwf, triggerLevel);
+        }
+
+        // arm the capture
+        Dwf.AnalogInConfigure(hdwf, true, true);
+
+        //NEED TO REFACTOR IF WE WANT TO HAVE THIS ERROR LOG
+        //if (!success) 
+        //{
+        //Dwf.AnalogInChannelEnableSet(hdwf,(int)CHANNELS.CHANNEL_1, true);
+        //Dwf.AnalogInChannelEnableSet(hdwf, (int)CHANNELS.CHANNEL_2, true);
+        //Dwf.AnalogInConfigure(hdwf, false, false);
+        //Debug.LogError("Error in analog capture triggered by waveformgenerator");
+        //}
+
+        return true;
+    }
 
     public static bool StartCustomPulseTrain(int idxChannel, double frequency, double offset, int numPulses, double[] rgdData)
     {
