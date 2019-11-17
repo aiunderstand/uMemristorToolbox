@@ -24,7 +24,7 @@ public class LineGraphContinuous2D : MonoBehaviour
         new Color32 (255,238,51,255), //yellow
         new Color32 (233,222,187,255), //tan
         new Color32 (255,205,243,255), //pink
-        new Color32 (227,255,0,255) //lt. lt. green (was white, but using white bg)
+        new Color32 (195,255,0,255) //lt. lt. green (was white, but using white bg)
     };
 
 
@@ -97,12 +97,33 @@ public class LineGraphContinuous2D : MonoBehaviour
     public static Vector3 ConvertDataPointToGraphPoint(Vector2 data)
     {
         //convert from range -2 to 2 to range 16 to 0 , by shifting to 0-4 range, multiply to 0-16 range and inverting 
+        if (data.x < rangeXmin)
+        {
+            data = new Vector2(rangeXmin, data.y);
+        }
+
+        if (data.x > rangeXmax)
+        {
+            data = new Vector2(rangeXmax, data.y);
+        }
+
         var x = 16 - (data.x + Mathf.Abs(rangeXmin)) *4;
 
         //convert from range -50 to 120 to range 0 to 17 , by shifting to 0-170, divide to 0-17 range 
-        var y = (data.y + Mathf.Abs(rangeYmin)) /10;
+        if (data.y < rangeYmin)
+        {
+            data = new Vector2(data.x, -50);
+        }
 
-        var xGraph = offsetX - (x*deltaX);
+        if (data.y > rangeYmax)
+        {
+            data = new Vector2(data.x, 120);
+        }
+
+        var y = (data.y + Mathf.Abs(rangeYmin)) / 10;
+
+
+        var xGraph = 50+ (x*deltaX);
         var yGraph = offsetY - (y*deltaY);
 
         Vector3 result = new Vector3(xGraph,yGraph,0);

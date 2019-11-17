@@ -21,6 +21,7 @@ public class SerialController
         serialThread = new Thread(() =>
         {
             Thread.CurrentThread.IsBackground = true;
+            serialThread.Name = "Serial Communication";
             try
             {
                 stream = new SerialPort("COM6", 9600, Parity.None, 8, StopBits.One);

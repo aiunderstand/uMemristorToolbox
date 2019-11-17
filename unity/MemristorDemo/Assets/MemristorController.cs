@@ -33,12 +33,12 @@ public class MemristorController
     public const uint ALL_DIO_OFF = 0b0000_0000_0000_0000; //deselect 
 
     //added from checkerboard experiment class
-    private static float V_READ = .1f;
-    private static float V_WRITE = 1f; //2
+    public static float V_READ = .1f;
+    public static float V_WRITE = 1f; //2
     //private static float V_WRITE1 = 0.5f; //1
-    private static float V_RESET = -2f; //0
+    public static float V_RESET = -2f; //0
     //private static float MIN_DEVIATION = .03F; // Line trace resistance, AD2 Calibration. [AIU] NOT USED?
-    private static int PULSE_WIDTH_IN_MICRO_SECONDS = 50_000;
+    public static int PULSE_WIDTH_IN_MICRO_SECONDS = 50_000; //is this micro or nanoseconds?
     private static float MIN_Q = 2; // minimum ratio between erase/write resistance
     private static float MEMINLINE_MIN_R = 10; // if all states are below this (kiloohms), its stuck low
     private static float MEMINLINE_MAX_R = 100; // if all state are above this (kilohms), its stuck low
@@ -49,13 +49,16 @@ public class MemristorController
     public static int SERIES_RESISTANCE = 10000; //ohm, series resistor, so 2 x 5k ohm
 
     //REFACTOR model with shared properties. Refactor so that shared properties from pulseutility, this class are in model class
-    public static MemristorModel Model = new MemristorModel(); 
-
+    public static MemristorModel Model = new MemristorModel();
+    public static AD2Scheduler Scheduler = new AD2Scheduler();
+    static Thread schedulerThread;
+    
     public enum Waveform
     {
         Square,
         HalfSine,
         TriangleUpDown,
+        SquareSmooth
     }
 
     public static void Init()
@@ -158,17 +161,16 @@ public class MemristorController
             String s;
             if (r[i] > 0)
             {
-                s = r[i].ToString("0.00 kΩ");
+                //s = r[i].ToString("0.00 kΩ");
+                s = r[i].ToString("0.00") + ";kΩ";
+
             }
             else
             {
-                s = "∞ Ω";
+                s = "∞;Ω";
             }
 
-            AppendWhiteSpace(s, b, COL_WIDTH);
-
-
-            b.Append("|");
+            AppendWhiteSpace(s, b, COL_WIDTH);           
         }
         return b.ToString();
     }
@@ -179,7 +181,7 @@ public class MemristorController
         b.Append(s);
         for (int j = 0; j < (COL_WIDTH - s.Length); j++)
         {
-            b.Append(" ");
+            b.Append(";");
         }
     }
 
@@ -260,19 +262,19 @@ public class MemristorController
         Logger.SaveExperimentDataToLog();
     }
 
-    public static void ReadTestExperiment()
+    public static void EraseWriteReadTestExperiment()
     {
         var date = DateTime.Today.ToShortDateString();
         var time = DateTime.Now.ToShortTimeString();
 
         //HEADER
-        var experiment = "Read test experiment";
+        var experiment = "erase write read experiment";
         var settings = string.Format("DATE: {0}  TIME: {5} V_WRITE: {1}v  V_RESET: {2}v  V_READ {3}v  SERIES_RES {4}Ω", date, V_WRITE, V_RESET, V_READ, SERIES_RESISTANCE, time);
         Logger.dataQueue.Add(experiment);
         Logger.dataQueue.Add(settings);
         
         // form device        
-        PulseUtility.ReadExperiment(Waveform.Square, Waveform.HalfSine, -V_WRITE, -V_RESET, -V_READ, PULSE_WIDTH_IN_MICRO_SECONDS, PULSE_WIDTH_IN_MICRO_SECONDS, PULSE_WIDTH_IN_MICRO_SECONDS);
+        PulseUtility.EraseWriteReadTestExperiment(Waveform.Square, Waveform.HalfSine, -V_WRITE, -V_RESET, -V_READ, PULSE_WIDTH_IN_MICRO_SECONDS, PULSE_WIDTH_IN_MICRO_SECONDS, PULSE_WIDTH_IN_MICRO_SECONDS);
 
         Logger.SaveExperimentDataToLog();
     }
@@ -306,6 +308,18 @@ public class MemristorController
         Logger.dataQueue.Add(settings);
 
         // form device (CURRENTLY ARGUMENTS ARE NOT USED, REFACTOR)   
+        //first do two clear passes, only once)
+        PulseUtility.measureAllSwitchResistances(Waveform.HalfSine, -V_RESET, PULSE_WIDTH_IN_MICRO_SECONDS);
+        Thread.Sleep(25);
+        var clear1Data = PulseUtility.measureAllSwitchResistances(Waveform.Square, -V_READ, PULSE_WIDTH_IN_MICRO_SECONDS);
+        Logger.dataQueue.Add(FormatResistanceArray("ERASE       ", clear1Data));
+        Thread.Sleep(25);
+        PulseUtility.measureAllSwitchResistances(Waveform.HalfSine, -V_RESET, PULSE_WIDTH_IN_MICRO_SECONDS);
+        Thread.Sleep(25);
+        var clear2Data = PulseUtility.measureAllSwitchResistances(Waveform.Square, -V_READ, PULSE_WIDTH_IN_MICRO_SECONDS);
+        Logger.dataQueue.Add(FormatResistanceArray("ERASE       ", clear2Data));
+        Thread.Sleep(25);
+
         //do all 16 memristors
         for (int i = 0; i < 16; i++)
         {
@@ -319,18 +333,104 @@ public class MemristorController
 
     public static void OneTritADCExperiment()
     {
-        throw new NotImplementedException();
+        //implement the hysteresis experiment
+        //create a custom controller that set the target resistance with in a safe bandwidth around it
+        //create a image with values and set values in memristor
+        //the experiment should show how long the value is stable
+
+        var date = DateTime.Today.ToShortDateString();
+        var time = DateTime.Now.ToShortTimeString();
+
+        //HEADER
+        var experiment = "One trit adc experiment";
+        var settings = string.Format("DATE: {0}  TIME: {5} V_WRITE: {1}v  V_RESET: {2}v  V_READ {3}v  SERIES_RES {4}Ω", date, V_WRITE, V_RESET, V_READ, SERIES_RESISTANCE, time);
+        Logger.dataQueue.Add(experiment);
+        Logger.dataQueue.Add(settings);
+
+        //start with clean sheet
+        //PulseUtility.EraseMemristorStates(Waveform.SquareSmooth, Waveform.SquareSmooth, -V_WRITE, -V_RESET, -V_READ, PULSE_WIDTH_IN_MICRO_SECONDS, PULSE_WIDTH_IN_MICRO_SECONDS, PULSE_WIDTH_IN_MICRO_SECONDS);
+        PulseUtility.EraseSingleMemristor(0, Waveform.HalfSine, -V_RESET, PULSE_WIDTH_IN_MICRO_SECONDS);
+        StartScheduler();
     }
 
-    public static void Read(int id)
+    public static void StartScheduler()
     {
-        //do actual read
+        //we start thread
+        schedulerThread = new Thread(() =>
+        {
+            Thread.CurrentThread.IsBackground = true;
+            schedulerThread.Name = "AD2 Scheduler";
+            Scheduler.IsActive = true;
+            Scheduler.IsProcessIdle = true;
 
+            try
+            {
+                while (Scheduler.IsActive) //this implementation assumes that queue consumption is faster than queue production. It will produce delays and a bufferoverflow if this is not the case!
+                {
+                    if (Scheduler.IsProcessIdle) //is this neccesary? We do this because some instructions are compound can be long running, but maybe the instructions are all running serial anyway
+                    {
+                        if (Scheduler.Queue.Count > 0)
+                        {
+                            //Grab a instruction/task from the scheduler queue
+                            try
+                            {
+                                AD2Instruction instruction;
+                                instruction = Scheduler.Process();
 
+                                if (instruction != null)
+                                {
+                                    switch (instruction.Instruction)
+                                    {
+                                        case AD2Scheduler.AD2Instructions.ReadAll:
+                                        {
+                                            Scheduler.IsProcessIdle = false;
+                                            PulseUtility.ReadAll(digitalIOStates);
+                                            }
+                                            break;
+                                        case AD2Scheduler.AD2Instructions.ReadSingle:
+                                        {
+                                            Scheduler.IsProcessIdle = false;
 
-        //put result in Output queue
+                                            ToggleMemristor(instruction.Id - 1, true);
+                                            //PulseUtility.ReadSingle(instruction.Id);
+                                            PulseUtility.ReadSingle2(instruction.Id);
+                                            ToggleMemristor(instruction.Id - 1, false);
+                                            }
+                                            break;
+                                        case AD2Scheduler.AD2Instructions.WriteSingle:
+                                        {
+                                            Scheduler.IsProcessIdle = false;
 
+                                            ToggleMemristor(instruction.Id - 1, true);
+                                            PulseUtility.WriteSingle(instruction.Id, instruction.State);
+                                            ToggleMemristor(instruction.Id - 1, false);
+                                       
+                                            }
+                                            break;
+                                    }
+                                }
+                            }
+                            catch
+                            {
+                            }
+                        }
+                    }
+                }
 
+                Logger.SaveExperimentDataToLog(); //SAVE DATA TO DISK
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[Exception] No scheduler started: {0}", ex);
+            }
+        });
+
+        schedulerThread.Start();
+    }   
+
+    public static void StopScheduler()
+    {
+        Scheduler.IsActive = false;
     }
 
     public static void Send(int id, string message)
@@ -343,6 +443,8 @@ public class MemristorController
 
     public static void Close()
     {
+        StopScheduler();
+
         //inspired by java port by Knowm https://github.com/knowm/memristor-discovery/blob/develop/src/main/java/org/knowm/memristor/discovery/DWFProxy.java
 
         // ///////////////////////////////////////////////////////////
@@ -400,6 +502,7 @@ public class MemristorController
         if (isOn)
         {
             digitalIOStates = digitalIOStates | (uint) (1 << memristorID);
+            Thread.Sleep(5);
         }
         else
         {

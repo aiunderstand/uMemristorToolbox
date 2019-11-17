@@ -3,15 +3,15 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using static AD2Scheduler;
 
 public class InputController : MonoBehaviour
 {
-    List<Button> buttons = new List<Button>();
+    public List<Button> buttons = new List<Button>();
+    public static List<int> GroundTruth =new List<int>();
 
     int maxTritValue =3;
 
-   
-    
     public void Awake()
     {
         //add buttons to list, assume same order as in UI
@@ -20,7 +20,9 @@ public class InputController : MonoBehaviour
         for (int i = 0; i < allButtons.Length; i++)
         {
             buttons.Add(allButtons[i]);
+            GroundTruth.Add(0);
         }
+
     }
 
     public void Update()
@@ -63,12 +65,12 @@ public class InputController : MonoBehaviour
 
         //set value
         buttonText.text = value.ToString();
+        GroundTruth[id - 1] = value;
 
         //send to memristor
-        MemristorController.Send(id, buttonText.text);
+        MemristorController.Scheduler.Schedule(new AD2Instruction(AD2Instructions.WriteSingle,id, value));
     }
-
-  
+      
     public void Reset()
     {
         for (int i = 0; i < buttons.Count; i++)

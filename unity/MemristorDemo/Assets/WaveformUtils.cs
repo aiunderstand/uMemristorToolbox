@@ -25,7 +25,7 @@ using static MemristorController;
 /** Created by timmolter on 2/15/17. */
 public class WaveformUtils
 {
-    public static double[] generateCustomWaveform(Waveform waveform, double amplitude, double frequency)
+    public static double[] GenerateCustomWaveform(Waveform waveform, double amplitude, double frequency)
     {
         Driver driver;
         switch (waveform)
@@ -38,6 +38,9 @@ public class WaveformUtils
                 break;
             case Waveform.TriangleUpDown:
                 driver = new TriangleUpDown("TriangleUpDown", 0, 0, amplitude, frequency);
+                break;
+            case Waveform.SquareSmooth:
+                driver = new SquareSmooth("SquareSmooth", 0, 0, amplitude, frequency);
                 break;
             default:
                 driver = new Square("Square", amplitude / 2, 0, amplitude / 2, frequency); //default was sawtooth!
@@ -52,6 +55,47 @@ public class WaveformUtils
         {
             double time = counter * timeInc;
             customWaveform[counter] = driver.getSignal(time) / 5.0; // / 5.0 to scale between 1 and -1
+        } while (++counter < 4096);
+
+        return customWaveform;
+    }
+
+    public static double[] GenerateCustomPulse(Waveform waveform, double amplitude, double pulseWidthInNS, double dutyCycle)
+    {
+        //    System.out.println("generateCustomPulse");
+        //    System.out.println("pulseWidth=" + pulseWidthInNS);
+        //    System.out.println("dutyCycle=" + dutyCycle);
+        //    System.out.println("amplitude=" + amplitude);
+        //    System.out.println("waveform=" + waveform);
+
+        Driver driver;
+
+        switch (waveform)
+        {
+            case Waveform.Square:
+                driver = new SquarePulse("Square", 0, pulseWidthInNS, dutyCycle, amplitude);
+                break;
+            case Waveform.HalfSine:
+                driver = new HalfSinePulse("HalfSine", 0, pulseWidthInNS, dutyCycle, amplitude);
+                break;
+            case Waveform.SquareSmooth:
+                driver = new SquareSmoothPulse("SquareSmooth", 0, pulseWidthInNS, dutyCycle, amplitude);
+                break;
+            default:
+                driver = new SquarePulse("Square", 0, pulseWidthInNS, dutyCycle, amplitude);
+                break;
+        }
+
+        int counter = 0;
+        double[] customWaveform = new double[4096];
+        double timeInc = driver.getPeriod() / 4096;
+
+        do
+        {
+            double time = counter * timeInc;
+            customWaveform[counter] =
+                driver.getSignal(time) / 5.0; // / 5.0 to scale between 1 and -1  HUH???
+
         } while (++counter < 4096);
 
         return customWaveform;

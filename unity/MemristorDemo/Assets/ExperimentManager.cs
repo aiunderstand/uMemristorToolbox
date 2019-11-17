@@ -3,12 +3,13 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 
+
 public class ExperimentManager : MonoBehaviour
 {
     public enum Experiments
     {
         Checkerboard = 0,
-        Read = 1,
+        EraseWriteRead = 1,
         ReadAfterDisconnect = 2,
         DC = 3,
         ADC = 4
@@ -35,8 +36,8 @@ public class ExperimentManager : MonoBehaviour
             case Experiments.Checkerboard:
                 MemristorController.CheckerboardExperiment();
                 break;
-            case Experiments.Read:
-                MemristorController.ReadTestExperiment();
+            case Experiments.EraseWriteRead:
+                MemristorController.EraseWriteReadTestExperiment();
                 break;
             case Experiments.ReadAfterDisconnect:
                 MemristorController.ReadTestAfterDisconnectExperiment();
@@ -45,7 +46,7 @@ public class ExperimentManager : MonoBehaviour
                 MemristorController.DCExperiment();
                 break;
             case Experiments.ADC:
-                //MemristorController.ADCExperiment();
+                MemristorController.OneTritADCExperiment();
                 break;
         }
     }
