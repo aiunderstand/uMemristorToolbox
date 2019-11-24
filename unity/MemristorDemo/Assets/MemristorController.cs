@@ -1,11 +1,10 @@
 ﻿using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 using System.Threading;
-using UnityEngine;
 using WaveFormsSDK;
-using static ExperimentManager;
+using Debug = UnityEngine.Debug;
 
 //this class uses API from waveform4j https://www.mvndoc.com/c/org.knowm/waveforms4j/org/knowm/waveforms4j/DWF.html
 //https://github.com/knowm/waveforms4j/blob/e49747b722803ffd768a9cf990f6bdcb0e347b54/src/main/java/org/knowm/waveforms4j/DWF.java
@@ -52,6 +51,7 @@ public class MemristorController
     public static MemristorModel Model = new MemristorModel();
     public static AD2Scheduler Scheduler = new AD2Scheduler();
     static Thread schedulerThread;
+    public static Stopwatch Stopwatch = new Stopwatch();
     
     public enum Waveform
     {
@@ -300,7 +300,8 @@ public class MemristorController
     {
         var date = DateTime.Today.ToShortDateString();
         var time = DateTime.Now.ToShortTimeString();
-
+        MemristorController.Stopwatch = new Stopwatch();
+        MemristorController.Stopwatch.Start();
         //HEADER
         var experiment = "DC Experiment";
         var settings = string.Format("DATE: {0}  TIME: {1} SERIES_RES {2}Ω", date, time, SERIES_RESISTANCE);
@@ -333,11 +334,6 @@ public class MemristorController
 
     public static void OneTritADCExperiment()
     {
-        //implement the hysteresis experiment
-        //create a custom controller that set the target resistance with in a safe bandwidth around it
-        //create a image with values and set values in memristor
-        //the experiment should show how long the value is stable
-
         var date = DateTime.Today.ToShortDateString();
         var time = DateTime.Now.ToShortTimeString();
 
@@ -350,7 +346,21 @@ public class MemristorController
         //start with clean sheet
         //PulseUtility.EraseMemristorStates(Waveform.SquareSmooth, Waveform.SquareSmooth, -V_WRITE, -V_RESET, -V_READ, PULSE_WIDTH_IN_MICRO_SECONDS, PULSE_WIDTH_IN_MICRO_SECONDS, PULSE_WIDTH_IN_MICRO_SECONDS);
         PulseUtility.EraseSingleMemristor(0, Waveform.HalfSine, -V_RESET, PULSE_WIDTH_IN_MICRO_SECONDS);
+
+        MemristorController.Stopwatch = new Stopwatch();
+        MemristorController.Stopwatch.Start();
+
         StartScheduler();
+    }
+    
+    public static string GetStopwatchTimeString()
+    {
+        return string.Format("{0}hh:{1}mm:{2}ss", MemristorController.Stopwatch.Elapsed.Hours, MemristorController.Stopwatch.Elapsed.Minutes, MemristorController.Stopwatch.Elapsed.Seconds);
+    }
+
+    public static double GetStopwatchTimeSeconds()
+    {
+        return Stopwatch.Elapsed.TotalSeconds;
     }
 
     public static void StartScheduler()
@@ -362,6 +372,9 @@ public class MemristorController
             schedulerThread.Name = "AD2 Scheduler";
             Scheduler.IsActive = true;
             Scheduler.IsProcessIdle = true;
+
+            //start producer thread
+            ExperimentManager.status = ExperimentManager.ExperimentStatus.Started;
 
             try
             {
@@ -393,7 +406,7 @@ public class MemristorController
 
                                             ToggleMemristor(instruction.Id - 1, true);
                                             //PulseUtility.ReadSingle(instruction.Id);
-                                            PulseUtility.ReadSingle2(instruction.Id);
+                                            PulseUtility.ReadSingle2(instruction.Id, instruction.State);
                                             ToggleMemristor(instruction.Id - 1, false);
                                             }
                                             break;

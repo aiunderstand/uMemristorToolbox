@@ -10,6 +10,7 @@ public class Logger : MonoBehaviour
     public static List<string> dataQueue = new List<string>();
 
     public static void SaveExperimentDataToLog() {
+        dataQueue.Add(string.Format("Experiment ended. Duration: {0}hh:{1}mm:{2}ss", MemristorController.Stopwatch.Elapsed.Hours, MemristorController.Stopwatch.Elapsed.Minutes, MemristorController.Stopwatch.Elapsed.Seconds));
 
         StreamWriter writer = new StreamWriter(logPath, true);
 

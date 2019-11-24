@@ -12,11 +12,21 @@ public class ExperimentManager : MonoBehaviour
         EraseWriteRead = 1,
         ReadAfterDisconnect = 2,
         DC = 3,
-        ADC = 4
+        ADC = 4,
+        Retention = 5,
+        RandomWrite = 6
+    }
+
+    public enum ExperimentStatus
+    {
+        NotReady,
+        Started
     }
 
     public TMP_Dropdown ExperimentSelector;
     public bool simulateControllers = true;
+    public static Experiments experiment;
+    public static ExperimentStatus status = ExperimentStatus.NotReady;
     public void Awake()
     {
         if (!simulateControllers)
@@ -29,7 +39,7 @@ public class ExperimentManager : MonoBehaviour
     public void StartExperiment()
     {
         //read dropdown
-        var experiment = (Experiments) ExperimentSelector.value;
+        experiment = (Experiments) ExperimentSelector.value;
 
         switch (experiment)
         {
@@ -48,6 +58,13 @@ public class ExperimentManager : MonoBehaviour
             case Experiments.ADC:
                 MemristorController.OneTritADCExperiment();
                 break;
+            case Experiments.Retention:
+                GameObject.FindObjectOfType<RetentionExperiment>().StartExperiment();
+                break;
+            case Experiments.RandomWrite:
+                GameObject.FindObjectOfType<RandomWriteExperiment>().StartExperiment();
+                break;
+
         }
     }
 

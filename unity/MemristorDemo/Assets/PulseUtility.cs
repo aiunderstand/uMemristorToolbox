@@ -37,11 +37,11 @@ public class PulseUtility
 {
     public enum PulseType
     {
-        Read,
-        WriteState1,
-        WriteState2,
-        Erase,
-        Error
+        Read = 4,
+        WriteState1 = 1,
+        WriteState2 = 2,
+        Erase = 0,
+        Error = 5
     }
     //refactor all these variables in the Model. The variables below are only used in some experiments
     static int _samplesPerPulse; 
@@ -196,7 +196,7 @@ public class PulseUtility
         MemristorController.StartAnalogCaptureBothChannelsTriggerOnWaveformGenerator(dWFWaveformChannel, _samples, _samplesPerPulse, true);
         MemristorController.WaitUntilArmed();
         double[] pulse = WaveformUtils.GenerateCustomWaveform(waveform, readVoltage, _sampleFrequency);
-        MemristorController.StartCustomPulseTrain(dWFWaveformChannel, _sampleFrequency, 0, 1, pulse);
+        MemristorController.StartCustomPulseTrain(dWFWaveformChannel, _sampleFrequency, 0, Model.GetPulseNumber(), pulse);
 
         bool success = MemristorController.CapturePulseData(_samples, 1);
         if (success)
@@ -332,7 +332,7 @@ public class PulseUtility
 
             for (int i = 0; i < timeData.Length; i++)
             {
-                graph.AddDataPointToLine(memristorId, new Vector2((float)vRMAccum[i], (float)dcurrentAccum[i]));
+                graph.AddConductanceVoltageDataPointToLine(memristorId, new Vector2((float)vRMAccum[i], (float)dcurrentAccum[i]));
 
                 Logger.dataQueue.Add(string.Format("MID;{0};T{1};vMR{2};VM;{3};Current;{4};Conductance;{5};deltaV;{6};vAccum;{7};dcurrentAccum;{8}",
                                                     memristorId, timeData[i], v2i[i], VMemristor[i], current[i], conductance[i], dv[i], vRMAccum[i], dcurrentAccum[i]));
@@ -348,9 +348,7 @@ public class PulseUtility
             MemristorController.StopAnalogCaptureBothChannels();
         }
     }
-
-   
-
+    
     internal static void ReadAll(uint digitalIOStates)
     {
         //write results to logger! Incl. expected value.
@@ -358,22 +356,42 @@ public class PulseUtility
         Scheduler.IsProcessIdle = true;
     }
 
-    public static void ReadSingle2(int id)
+    public static void  ReadSingle2(int id, int groundTruth)
     {
         Model.SetAmplitude(MemristorController.V_READ);
         var resistance = getSwitchResistancekOhm(Waveform.Square, (float) -Model.GetAmplitude(), MemristorController.PULSE_WIDTH_IN_MICRO_SECONDS, (int)CHANNELS.CHANNEL_1);
 
-        int state = GetGroundTruth(id);
-        var actualTrit = ConvertOhmToTrit((float)resistance);
-        Logger.dataQueue.Add(string.Format("STATUS;{0};ACTION;{1};ACTUAL;{2};GROUNDTRUTH;{3};K_OHMS;{4};LowerTHRESHOLD;{5};UpperTHRESHOLD;{6};D_ToLowerThreshold;{7};D_ToUpperhreshold;{8};", (actualTrit == state ? "OK" : "FAIL"), PulseType.Read.ToString(), actualTrit, state, resistance, OutputController.LowerLimitState, OutputController.UpperLimitState, Math.Abs(resistance - OutputController.LowerLimitState), Math.Abs(resistance - OutputController.UpperLimitState)));
-
-        //Update value (don't wait for read interval)
-        MemristorController.Output.Enqueue(string.Format("{0},{1}", id, actualTrit));
+        switch (experiment)
+        {
+            case Experiments.ADC: {
+                int state = GetGroundTruth(id);
+                var actualTrit = ConvertOhmToTrit((float)resistance);
+                var time = GetStopwatchTimeString();
+                Logger.dataQueue.Add(string.Format(
+                    "STATUS;{0};ACTION;{1};ACTUAL;{2};GROUNDTRUTH;{3};K_OHMS;{4};LowerTHRESHOLD;{5};UpperTHRESHOLD;{6};D_ToLowerThreshold;{7};D_ToUpperhreshold;{8};Time;{9}",
+                    (actualTrit == state ? "OK" : "FAIL"), PulseType.Read.ToString(), actualTrit, state, resistance,
+                    OutputController.LowerLimitState, OutputController.UpperLimitState,
+                    Math.Abs(resistance - OutputController.LowerLimitState),
+                    Math.Abs(resistance - OutputController.UpperLimitState), time));
+              
+                //Update value (don't wait for read interval)
+                MemristorController.Output.Enqueue(string.Format("{0},{1}", id, actualTrit));
+                }
+                break;
+            case Experiments.Retention:
+            {
+                var time = GetStopwatchTimeString();
+                Logger.dataQueue.Add(string.Format(
+                    "ACTION;READ;K_OHMS;{0};GroundTruth;{1};Actual;{2};Time;{3}",resistance, groundTruth, ConvertOhmToTrit((float)resistance),time));
+                UIManager.GraphQueue.Enqueue(new GraphInstruction(experiment, new Vector2((float) GetStopwatchTimeSeconds(),resistance)));
+            }
+                break;
+        }
 
         Scheduler.IsProcessIdle = true;
 
     }
-
+    
     public static void ReadSingle(int id)
     {
         //the returned value
@@ -654,14 +672,17 @@ public class PulseUtility
             case PulseType.WriteState1:
                 Model.SetAmplitude(voltage);
                 Model.SetWaveform(Waveform.HalfSine);
+                Model.SetPulseNumber(1);
                 break;
             case PulseType.WriteState2:
                 Model.SetAmplitude(voltage);
                 Model.SetWaveform(Waveform.HalfSine);
+                Model.SetPulseNumber(1);
                 break;
             case PulseType.Erase:
                 Model.SetAmplitude(voltage);
                 Model.SetWaveform(Waveform.HalfSine);
+                Model.SetPulseNumber(1);
                 break;
         }
 
@@ -672,7 +693,8 @@ public class PulseUtility
     {
         var stateReached = false; //read value matches desired state 
         var tries = 0; //max 3 tries;
-        float voltage = 0.3f;//default is -0.4f, since in the actual call negates this voltage. Refactor, confusing!
+        int sign = 1; //positive;
+        float voltage;
         while (stateReached == false)
         {
             PulseType action;
@@ -682,22 +704,40 @@ public class PulseUtility
                 case 0:
                 {
                     action = PulseType.Erase;
-                    //resistance = SingleWritePulse(id, action);
-                    SingleWrite2(id, action, MemristorController.V_RESET);
+                        //resistance = SingleWritePulse(id, action);
+                    voltage = MemristorController.V_RESET;
+                    SingleWrite2(id, action, voltage);
                 }
                     break;
                 case 1:
                 {
                     action = PulseType.WriteState1;
-                    //resistance = SingleWritePulse(id, action);
-                    SingleWrite2(id, action, voltage);
+                    voltage = 0.4f;
+                    if (tries == 0)
+                    {
+                        //always do single erase before write
+                        getSwitchResistancekOhm(Waveform.HalfSine, -MemristorController.V_RESET,
+                            MemristorController.PULSE_WIDTH_IN_MICRO_SECONDS, (int) CHANNELS.CHANNEL_1);
+                        Thread.Sleep(25);
+                    }
+
+                    SingleWrite2(id, action, sign * voltage);
                     }
                     break;
                 case 2:
                 {
                     action = PulseType.WriteState2;
-                    //resistance = SingleWritePulse(id, action);
-                    SingleWrite2(id, action, MemristorController.V_WRITE);
+                        //resistance = SingleWritePulse(id, action);
+                        voltage = MemristorController.V_WRITE;
+                        if (tries == 0)
+                        {
+                            //always do single erase before write
+                            getSwitchResistancekOhm(Waveform.HalfSine, -MemristorController.V_RESET,
+                                MemristorController.PULSE_WIDTH_IN_MICRO_SECONDS, (int) CHANNELS.CHANNEL_1);
+                            Thread.Sleep(25);
+                        }
+
+                        SingleWrite2(id, action, sign * voltage);
                 }
                     break;
                 default:
@@ -727,15 +767,14 @@ public class PulseUtility
                 tries++;
 
                 //change polarity if direction of pulse is wrong, only applies to state 1, being middle
-                if (state == 1)
-                {
-                    if (resistance <= OutputController.LowerLimitState)
-                        voltage = -0.3f;
-                    else
-                        voltage = 0.3f;
-                }
+              
+                if (resistance <= OutputController.LowerLimitState)
+                    sign  = -1;
+                else
+                    sign = 1;
+          
 
-                if (tries >= 3) //we fail and stop trying
+                if (tries >= 4) //we fail and stop trying
                 {
                     stateReached = true;
                     MemristorController.Output.Enqueue(string.Format("{0},{1}", id, actualTrit));

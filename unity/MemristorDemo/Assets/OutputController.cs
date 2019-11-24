@@ -19,8 +19,8 @@ public class OutputController : MonoBehaviour
     public float ReadingIntervalInSec = 1; //1 Seconds intervals
     float timePassed = 0; 
 
-    public static int UpperLimitState;
-    public static int LowerLimitState;
+    public static int UpperLimitState = 100; //refactor this should the range UI slider is used by more experiments
+    public static int LowerLimitState = 8;
 
 
     public void Awake()
@@ -70,55 +70,60 @@ public class OutputController : MonoBehaviour
 
     public void Update()
     {
-        if (delayTime >= delay)
+        if (ExperimentManager.status == ExperimentManager.ExperimentStatus.Started)
         {
-            delayTime = 0;
-
-            //check Output queue, if something process one per frame
-            if (MemristorController.Output.Count > 0)
+            if (delayTime >= delay)
             {
-                string message = "";
-                MemristorController.Output.TryDequeue(out message);
+                delayTime = 0;
 
-                if (!message.Equals(""))
+                //check Output queue, if something process one per frame
+                if (MemristorController.Output.Count > 0)
                 {
-                    //message type is of string format "id,value"  
-                    var parts = message.Split(',');
-                    var id = int.Parse(parts[0]);
-                    var value = parts[1];
+                    string message = "";
+                    MemristorController.Output.TryDequeue(out message);
 
-                    //update Memristor Output UI
-                    var led = memristors[id - 1].GetComponentInChildren<TextMeshProUGUI>();
-
-                    //enable or disable using memristor
-                    if (value.Contains("-1"))  //DISABLE LED
+                    if (!message.Equals(""))
                     {
-                        led.text = "-";
-                        value = "0";
+                        //message type is of string format "id,value"  
+                        var parts = message.Split(',');
+                        var id = int.Parse(parts[0]);
+                        var value = parts[1];
 
-                        //update Hardware LEDs
-                        SerialController.Send(string.Format("${0},{1},{2};", (int)MessageType.UpdateMatrixSingle, id, value));
-                    }
-                    else //ENABLE LED
-                    {
-                        led.text = value;
+                        //update Memristor Output UI
+                        var led = memristors[id - 1].GetComponentInChildren<TextMeshProUGUI>();
 
-                        //update Hardware LEDs
-                        SerialController.Send(string.Format("${0},{1},{2};", (int)MessageType.UpdateMatrixSingle, id, value));                        
+                        //enable or disable using memristor
+                        if (value.Contains("-1")) //DISABLE LED
+                        {
+                            led.text = "-";
+                            value = "0";
+
+                            //update Hardware LEDs
+                            SerialController.Send(string.Format("${0},{1},{2};", (int) MessageType.UpdateMatrixSingle,
+                                id, value));
+                        }
+                        else //ENABLE LED
+                        {
+                            led.text = value;
+
+                            //update Hardware LEDs
+                            SerialController.Send(string.Format("${0},{1},{2};", (int) MessageType.UpdateMatrixSingle,
+                                id, value));
+                        }
                     }
                 }
             }
-        }
 
-        //Start reading pulse every x second
-        if (timePassed > ReadingIntervalInSec)
-        {
-            timePassed = 0;
-            MemristorController.Scheduler.Schedule(new AD2Instruction(AD2Instructions.ReadSingle,1));
-        }
+            //Start reading pulse every x second
+            if (timePassed > ReadingIntervalInSec)
+            {
+                timePassed = 0;
+                MemristorController.Scheduler.Schedule(new AD2Instruction(AD2Instructions.ReadSingle, 1));
+            }
 
-        delayTime += Time.deltaTime;
-        timePassed += Time.deltaTime;
+            delayTime += Time.deltaTime;
+            timePassed += Time.deltaTime;
+        }
     }
 
 

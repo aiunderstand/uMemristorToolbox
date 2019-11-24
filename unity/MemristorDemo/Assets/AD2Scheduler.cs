@@ -56,16 +56,17 @@ public class AD2Instruction{
         Instruction = instruction;
     }
 
-    public AD2Instruction(AD2Instructions instruction, int id, int state)
+    public AD2Instruction(AD2Instructions instruction, int id, int state) //used for reading (groundtruth) and writing
     {
         Instruction = instruction;
         Id = id;
         State = state;
     }
 
-    public AD2Instruction(AD2Instructions instruction, int id)
+    public AD2Instruction(AD2Instructions instruction, int id) //used for when there is no groundtruth
     {
         Instruction = instruction;
-        Id = id;        
+        Id = id;
     }
 }
+
