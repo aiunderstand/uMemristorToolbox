@@ -1,0 +1,16 @@
+packages/
+.vs/
+bin/
+obj/
+_NCrunch_*/
+testresults/
+NDependOut/
+releases/
+
+*.ncrunchsolution
+*.ncrunchproject
+*.user
+*.suo
+*.ndproj
+
+push.cmd
