@@ -16,7 +16,7 @@ public class OutputController : MonoBehaviour
     float delay = 0.05f;
 
     [Range (0.5f,10f)]
-    public float ReadingIntervalInSec = 10; //10 Seconds intervals
+    public float ReadingIntervalInSec = 1; //1 Seconds intervals
     float timePassed = 0; 
 
     public static int UpperLimitState = 100; //refactor this should the range UI slider is used by more experiments

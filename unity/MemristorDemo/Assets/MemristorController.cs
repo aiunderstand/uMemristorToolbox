@@ -37,7 +37,7 @@ public class MemristorController
     //private static float V_WRITE1 = 0.5f; //1
     public static float V_RESET = -2f; //0
     //private static float MIN_DEVIATION = .03F; // Line trace resistance, AD2 Calibration. [AIU] NOT USED?
-    public static int PULSE_WIDTH_IN_MICRO_SECONDS = 50_000; //50.000 us is 50 ms on and 50 ms off, resulting in frequency of 10 hz = period of .1S
+    public static int PULSE_WIDTH_IN_MICRO_SECONDS = 50_000; 
     private static float MIN_Q = 2; // minimum ratio between erase/write resistance
     private static float MEMINLINE_MIN_R = 10; // if all states are below this (kiloohms), its stuck low
     private static float MEMINLINE_MAX_R = 100; // if all state are above this (kilohms), its stuck low
@@ -276,6 +276,7 @@ public class MemristorController
         // form device        
         PulseUtility.EraseWriteReadTestExperiment(Waveform.Square, Waveform.HalfSine, -V_WRITE, -V_RESET, -V_READ, PULSE_WIDTH_IN_MICRO_SECONDS, PULSE_WIDTH_IN_MICRO_SECONDS, PULSE_WIDTH_IN_MICRO_SECONDS);
 
+
         Logger.SaveExperimentDataToLog();
     }
 
@@ -336,8 +337,7 @@ public class MemristorController
     {
         int memristorId = 2; //we need to make an interface for this , currently id = 2 = memristor 3.
 
-
-    var date = DateTime.Today.ToShortDateString();
+        var date = DateTime.Today.ToShortDateString();
         var time = DateTime.Now.ToShortTimeString();
 
         //HEADER

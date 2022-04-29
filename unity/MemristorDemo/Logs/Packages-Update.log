@@ -16,6 +16,7 @@ The following packages were updated:
   com.unity.collab-proxy from version 1.2.9 to 1.2.16
   com.unity.textmeshpro from version 2.0.0 to 2.0.1
   com.unity.timeline from version 0.0.0-builtin to 1.1.0
+<<<<<<< HEAD
 
 === Mon Apr 25 17:39:28 2022
 
@@ -34,3 +35,5 @@ The following packages were updated:
   com.unity.timeline from version 1.1.0 to 1.5.4
 The following packages were removed:
   com.unity.package-manager-ui@2.2.0
+=======
+>>>>>>> a7c44a6c28075ba99e3262e503664909c11952e4

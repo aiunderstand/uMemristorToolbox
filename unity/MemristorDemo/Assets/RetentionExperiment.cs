@@ -10,7 +10,6 @@ using System.Diagnostics;
 using Tayx.Graphy.Utils.NumString;
 using System.Threading;
 using WaveFormsSDK;
-
 public class RetentionExperiment : MonoBehaviour
 {
     public enum Intervals
