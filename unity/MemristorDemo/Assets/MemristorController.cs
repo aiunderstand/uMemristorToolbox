@@ -45,7 +45,7 @@ public class MemristorController
     private static int meminline_numFailed = 0;
     private static int COL_WIDTH = 10;
     public static float MIN_VOLTAGE_MEASURE_AMPLITUDE = .005f;
-    public static int SERIES_RESISTANCE = 2500; //ohm, in series but with memristor but we have two 5K ohm resistors in parallel, so 2.5k ohm
+    public static int SERIES_RESISTANCE = 10000; //ohm, in series but with memristor but we have two 5K ohm resistors in parallel, so 2.5k ohm
 
     //REFACTOR model with shared properties. Refactor so that shared properties from pulseutility, this class are in model class
     public static MemristorModel Model = new MemristorModel();
@@ -409,8 +409,18 @@ public class MemristorController
 
                                             ToggleMemristor(instruction.Id - 1, true);
                                             //PulseUtility.ReadSingle(instruction.Id);
-                                            PulseUtility.ReadSingle2(instruction.Id, instruction.State);
+                                            PulseUtility.ReadSingle2(instruction, instruction.State);
                                             ToggleMemristor(instruction.Id - 1, false);
+                                            }
+                                            break;
+                                        case AD2Scheduler.AD2Instructions.ReadSingleWithoutMux:
+                                            {
+                                                Scheduler.IsProcessIdle = false;
+
+                                                //ToggleMemristor(instruction.Id - 1, true);
+                                                //PulseUtility.ReadSingle(instruction.Id);
+                                                PulseUtility.ReadSingle2(instruction, instruction.State);
+                                                //ToggleMemristor(instruction.Id - 1, false);
                                             }
                                             break;
                                         case AD2Scheduler.AD2Instructions.WriteSingle:

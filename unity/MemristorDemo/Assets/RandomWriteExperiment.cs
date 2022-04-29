@@ -57,7 +57,7 @@ public class RandomWriteExperiment : MonoBehaviour
         //add all writes to schedule
         for (int i = 0; i < groundTruthStates.Count; i++)
         {
-            MemristorController.Scheduler.Schedule(new AD2Instruction(AD2Instructions.WriteSingle, memristorId, groundTruthStates[i]));
+            MemristorController.Scheduler.Schedule(new AD2Instruction(AD2Instructions.WriteSingle, memristorId, groundTruthStates[i], 0, 0, MemristorController.Waveform.HalfSine, 0)); //we ignore the part after value
         }
 
         MemristorController.Stopwatch.Restart(); //this is not accurate enough at this position.

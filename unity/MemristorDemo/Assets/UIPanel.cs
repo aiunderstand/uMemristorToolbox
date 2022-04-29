@@ -48,7 +48,7 @@ public class UIPanel : MonoBehaviour
                 //init DC graphs, refactor in experiment classes with UI and Logic part
                 activeGraph = UIManager.Panels[Experiments.Retention].GetComponentInChildren<LineGraphContinuous2D>();
 
-                string[] lineLabels = new string[3];
+                string[] lineLabels = new string[9];
                 lineLabels[0] = "State 0";
                 lineLabels[1] = "State 1";
                 lineLabels[2] = "State 2";

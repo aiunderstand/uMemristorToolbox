@@ -357,15 +357,18 @@ public class PulseUtility
         Scheduler.IsProcessIdle = true;
     }
 
-    public static void  ReadSingle2(int id, int groundTruth)
+    public static void  ReadSingle2(AD2Instruction instruction, int groundTruth)
     {
-        Model.SetAmplitude(MemristorController.V_READ);
-        var resistance = getSwitchResistancekOhm(Waveform.Square, (float) -Model.GetAmplitude(), MemristorController.PULSE_WIDTH_IN_MICRO_SECONDS, (int)CHANNELS.CHANNEL_1);
+        Model.SetAmplitude(instruction.Amplitude);
+        Model.SetWaveform(instruction.Shape);
+        Model.SetPulseNumber(instruction.PulseNumber);
+
+        var resistance = getSwitchResistancekOhm(Model.GetWaveform(), (float) -Model.GetAmplitude(), instruction.Duration, (int)CHANNELS.CHANNEL_1);
 
         switch (experiment)
         {
             case Experiments.ADC: {
-                int state = GetGroundTruth(id);
+                int state = GetGroundTruth(instruction.Id);
                 var actualTrit = ConvertOhmToTrit((float)resistance);
                 var time = GetStopwatchTimeString();
                 Logger.dataQueue.Add(string.Format(
@@ -376,7 +379,7 @@ public class PulseUtility
                     Math.Abs(resistance - OutputController.UpperLimitState), time));
               
                 //Update value (don't wait for read interval)
-                MemristorController.Output.Enqueue(string.Format("{0},{1}", id, actualTrit));
+                MemristorController.Output.Enqueue(string.Format("{0},{1}", instruction.Id, actualTrit));
                 }
                 break;
             case Experiments.Retention:

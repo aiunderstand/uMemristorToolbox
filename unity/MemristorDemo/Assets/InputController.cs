@@ -68,7 +68,7 @@ public class InputController : MonoBehaviour
         GroundTruth[id - 1] = value;
 
         //send to memristor
-        MemristorController.Scheduler.Schedule(new AD2Instruction(AD2Instructions.WriteSingle,id, value));
+        MemristorController.Scheduler.Schedule(new AD2Instruction(AD2Instructions.WriteSingle,id, value, 0, 0,MemristorController.Waveform.HalfSine,0)); //we ignore the part after value
     }
       
     public void Reset()
