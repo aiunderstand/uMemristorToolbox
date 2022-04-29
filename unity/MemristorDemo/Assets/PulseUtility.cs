@@ -44,6 +44,7 @@ public class PulseUtility
         Error = 5
     }
     //refactor all these variables in the Model. The variables below are only used in some experiments
+    //refactor all pulsewidth in microseconds to in nanoseconds
     static int _samplesPerPulse; 
     static int _sampleFrequency;
     static int _samples; //used setting getScopesAverageVoltage
@@ -665,6 +666,7 @@ public class PulseUtility
         return (float)averageCurrentInOhms;
     }
 
+    //atomic write waveform
     public static void SingleWrite2(int id, PulseType type, float voltage)
     {
         switch (type)
@@ -689,6 +691,7 @@ public class PulseUtility
         getSwitchResistancekOhm(Model.GetWaveform(), (float)-Model.GetAmplitude(), MemristorController.PULSE_WIDTH_IN_MICRO_SECONDS, (int)CHANNELS.CHANNEL_1);
     }
 
+    //should rename this to memristor controller as this will attempt rewrites to push it is in the correct state
     public static void WriteSingle(int id, int state)
     {
         var stateReached = false; //read value matches desired state 

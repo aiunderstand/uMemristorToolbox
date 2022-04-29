@@ -37,7 +37,7 @@ public class MemristorController
     //private static float V_WRITE1 = 0.5f; //1
     public static float V_RESET = -2f; //0
     //private static float MIN_DEVIATION = .03F; // Line trace resistance, AD2 Calibration. [AIU] NOT USED?
-    public static int PULSE_WIDTH_IN_MICRO_SECONDS = 50_000; //is this micro or nanoseconds?
+    public static int PULSE_WIDTH_IN_MICRO_SECONDS = 50_000; //50.000 us is 50 ms on and 50 ms off, resulting in frequency of 10 hz = period of .1S
     private static float MIN_Q = 2; // minimum ratio between erase/write resistance
     private static float MEMINLINE_MIN_R = 10; // if all states are below this (kiloohms), its stuck low
     private static float MEMINLINE_MAX_R = 100; // if all state are above this (kilohms), its stuck low
@@ -45,7 +45,7 @@ public class MemristorController
     private static int meminline_numFailed = 0;
     private static int COL_WIDTH = 10;
     public static float MIN_VOLTAGE_MEASURE_AMPLITUDE = .005f;
-    public static int SERIES_RESISTANCE = 10000; //ohm, series resistor, so 2 x 5k ohm
+    public static int SERIES_RESISTANCE = 2500; //ohm, in series but with memristor but we have two 5K ohm resistors in parallel, so 2.5k ohm
 
     //REFACTOR model with shared properties. Refactor so that shared properties from pulseutility, this class are in model class
     public static MemristorModel Model = new MemristorModel();
@@ -334,7 +334,10 @@ public class MemristorController
 
     public static void OneTritADCExperiment()
     {
-        var date = DateTime.Today.ToShortDateString();
+        int memristorId = 2; //we need to make an interface for this , currently id = 2 = memristor 3.
+
+
+    var date = DateTime.Today.ToShortDateString();
         var time = DateTime.Now.ToShortTimeString();
 
         //HEADER
@@ -345,7 +348,7 @@ public class MemristorController
 
         //start with clean sheet
         //PulseUtility.EraseMemristorStates(Waveform.SquareSmooth, Waveform.SquareSmooth, -V_WRITE, -V_RESET, -V_READ, PULSE_WIDTH_IN_MICRO_SECONDS, PULSE_WIDTH_IN_MICRO_SECONDS, PULSE_WIDTH_IN_MICRO_SECONDS);
-        PulseUtility.EraseSingleMemristor(0, Waveform.HalfSine, -V_RESET, PULSE_WIDTH_IN_MICRO_SECONDS);
+        PulseUtility.EraseSingleMemristor(memristorId, Waveform.HalfSine, -V_RESET, PULSE_WIDTH_IN_MICRO_SECONDS);
 
         MemristorController.Stopwatch = new Stopwatch();
         MemristorController.Stopwatch.Start();

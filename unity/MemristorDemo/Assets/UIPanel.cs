@@ -52,8 +52,14 @@ public class UIPanel : MonoBehaviour
                 lineLabels[0] = "State 0";
                 lineLabels[1] = "State 1";
                 lineLabels[2] = "State 2";
+                lineLabels[3] = "State 3";
+                lineLabels[4] = "State 4";
+                lineLabels[5] = "State 5";
+                lineLabels[6] = "State 6";
+                lineLabels[7] = "State 7";
+                lineLabels[8] = "State 8";
 
-                var retExp = GameObject.FindObjectOfType<RetentionExperiment>();
+                    var retExp = GameObject.FindObjectOfType<RetentionExperiment>();
 
                 switch (retExp.ReadingIntervalInSec)
                 {

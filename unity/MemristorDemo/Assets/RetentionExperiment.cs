@@ -8,7 +8,8 @@ using static ExperimentManager;
 using static MemristorController;
 using System.Diagnostics;
 using Tayx.Graphy.Utils.NumString;
-using UnityScript.Scripting.Pipeline;
+using System.Threading;
+using WaveFormsSDK;
 
 public class RetentionExperiment : MonoBehaviour
 {
@@ -22,7 +23,7 @@ public class RetentionExperiment : MonoBehaviour
 
     public Intervals ReadingIntervalInSec = Intervals.Freq1Hz;
     public static Intervals Interval;
-    public static int GraphLineId = 1;
+    public static int GraphLineId;
     private float frequency;
     float timePassed = 0;
     public GameObject horizontalBar1Hz; //refactor this in graph settings
@@ -31,12 +32,21 @@ public class RetentionExperiment : MonoBehaviour
     [Range (1,16)]
     public int memristorId = 1;
     int n = 0;
+    List<Threshold> states = new List<Threshold>();
+    public int N = 10; //read datapoints
 
-    public int N = 10; //datapoints
+    public Threshold[] thresholds = new Threshold[9];
 
-    private bool hasPhase1Completed = false;
-    private bool hasPhase2Completed = false;
-    private bool hasPhase3Completed = false;
+    [System.Serializable]
+    public class Threshold
+    {
+        public bool isEnabled = false;
+        [Range(-2.0f, 1.5f)]
+        public float pulseAmplitude;
+
+        [Range(1, 50000)] //im not sure if the analog discovery 2 or pro can send 10 ns second pulse width. It can do 100ns (10 Mhz), maybe refactor to nano seconds  
+        public int pulseWidthInUs; //50_000 is default = freq of 10 Hz in waveform or 1 pulse of 50 ms on and 50 ms off
+    }
 
     public void StartExperiment()
     {
@@ -51,170 +61,82 @@ public class RetentionExperiment : MonoBehaviour
             case Intervals.Freq1Hz:
                 horizontalBar1Hz.SetActive(true);
                 horizontalBar1_60Hz.SetActive(false);
+                frequency = 1;
                 break;
             case Intervals.Freq1_60Hz:
                 horizontalBar1Hz.SetActive(false);
                 horizontalBar1_60Hz.SetActive(true);
+                frequency = 60;
                 break;
         }
+
         //HEADER
         var experiment = "Retention Experiment";
         var settings = string.Format("DATE: {0}  TIME: {5} V_WRITE: {1}v  V_RESET: {2}v  V_READ {3}v  SERIES_RES {4}Ω", date, V_WRITE, V_RESET, V_READ, SERIES_RESISTANCE, time);
         Logger.dataQueue.Add(experiment);
         Logger.dataQueue.Add(settings);
 
-        //start with state 0
-        SetState(PulseUtility.PulseType.WriteState1);
+        //determine states to be processed
+        for (int i = 0; i < thresholds.Length; i++)
+        {
+            if (thresholds[i].isEnabled)
+                states.Add(thresholds[i]);
+        }
+
+        //We trigger the mux to select the correct memristor
+        ToggleMemristor(memristorId - 1, true);
+
+        //Start with erase
+        for (int i = 0; i < 2; i++)
+        {
+            //do erase (read resistance from erase/write is invalid, so use read pulses only)
+            PulseUtility.getSwitchResistancekOhm(Waveform.HalfSine, -V_RESET, PULSE_WIDTH_IN_MICRO_SECONDS, (int)CHANNELS.CHANNEL_1);
+            Thread.Sleep(25);
+
+            //do read DONT FORGET TO PUT -sign for each voltage level, we should refactor this.
+            var resistance = PulseUtility.getSwitchResistancekOhm(Waveform.Square, -MemristorController.V_READ, MemristorController.PULSE_WIDTH_IN_MICRO_SECONDS, (int)CHANNELS.CHANNEL_1);
+            Thread.Sleep(25);
+            Logger.dataQueue.Add("Erase " + i + " resistance= " + resistance);
+        }
         MemristorController.Stopwatch.Restart();
 
         StartScheduler();
     }
 
-    //We should use the scheduler for this...
-    public void SetState(PulseUtility.PulseType state)
-    {
-        PulseUtility.EraseSingleMemristor(memristorId-1, Waveform.HalfSine, -V_RESET, PULSE_WIDTH_IN_MICRO_SECONDS);
-
-        ToggleMemristor(memristorId-1, true);
-       
-        float voltage = 0;
-        
-        switch (state)
-        {
-            case PulseUtility.PulseType.Erase:
-                voltage = V_RESET;
-
-                break;
-            case PulseUtility.PulseType.WriteState1:
-                voltage = 0.4f;
-                break;
-            case PulseUtility.PulseType.WriteState2:
-                voltage = V_WRITE;
-                break;
-        }
-        
-        PulseUtility.SingleWrite2(memristorId-1, state, voltage);
-        Logger.dataQueue.Add("ACTION;WRITE;STATE;" + (int) state);
-        ToggleMemristor(memristorId-1, false);
-    }
-
-    // Start is called before the first frame update
-    public void Start()
-    {
-        switch (ReadingIntervalInSec)
-        {
-            case Intervals.Freq1Hz:
-                frequency = 1;
-                break;
-            case Intervals.Freq10Hz:
-                frequency = 0.1f;
-                break;
-            case Intervals.Freq1_60Hz:
-                frequency = 60;
-                break;
-            case Intervals.Freq1_600Hz:
-                frequency = 600; 
-                break;
-        }
-    }
-
+  
     // Update is called once per frame
     public void Update()
     {
-        if (ExperimentManager.status == ExperimentStatus.Started)
+        if (ExperimentManager.experiment == ExperimentManager.Experiments.Retention)
         {
-            if (!hasPhase1Completed)
+            if (ExperimentManager.status == ExperimentStatus.Started)
             {
-                //Start reading pulse every x second
-                if (timePassed > frequency)
+                for (int i = 0; i < states.Count; i++)
                 {
-                    if (n >= N)
-                    {
-                        hasPhase1Completed = true;
-                        InitPhase2();
-                    }
-                    else
+                    Model.SetAmplitude(states[i].pulseAmplitude);
+                    Model.SetWaveform(Waveform.HalfSine);
+                    Model.SetPulseNumber(1);
+                    PulseUtility.getSwitchResistancekOhm(Model.GetWaveform(), (float)-Model.GetAmplitude(), states[i].pulseWidthInUs , (int)CHANNELS.CHANNEL_1);
+                    Logger.dataQueue.Add("ACTION;WRITE;STATE;" + i);
+                    MemristorController.Stopwatch.Restart();
+                    timePassed = 0;
+                    n = 0;
+                    GraphLineId = i;
+                    Thread.Sleep(25);
+
+                    //Start reading pulse every x second
+                    if ((timePassed > frequency) && (n < N))
                     {
                         n++;
                         timePassed = 0;
-                        MemristorController.Scheduler.Schedule(new AD2Instruction(AD2Instructions.ReadSingle, memristorId,1));
-                    }
-                }
-
-                timePassed += Time.deltaTime;
-            }
-            else
-            {
-                if (!hasPhase2Completed)
-                {
-                    //Start reading pulse every x second
-                    if (timePassed > frequency)
-                    {
-                        if (n >= N)
-                        {
-                            hasPhase2Completed = true;
-                            InitPhase3();
-                        }
-                        else
-                        {
-                            n++;
-                            timePassed = 0;
-                            MemristorController.Scheduler.Schedule(
-                                new AD2Instruction(AD2Instructions.ReadSingle, memristorId, 2));
-                        }
+                        MemristorController.Scheduler.Schedule(new AD2Instruction(AD2Instructions.ReadSingle, memristorId, 1));    
                     }
 
                     timePassed += Time.deltaTime;
                 }
-                else
-                {
-                    if (!hasPhase3Completed)
-                    {
-                        //Start reading pulse every x second
-                        if (timePassed > frequency)
-                        {
-                            if (n >= N)
-                            {
-                                hasPhase3Completed = true;
-                                ExperimentManager.status = ExperimentStatus.NotReady;
-                            }
-                            else
-                            {
-                                n++;
-                                timePassed = 0;
-                                MemristorController.Scheduler.Schedule(
-                                    new AD2Instruction(AD2Instructions.ReadSingle, memristorId, 0));
-                            }
-                        }
 
-                        timePassed += Time.deltaTime;
-                    }
-                }
-
+                ToggleMemristor(memristorId - 1, false);
             }
-
-
-            
         }
     }
-
-    private void InitPhase2()
-    {
-        SetState(PulseUtility.PulseType.WriteState2);
-        MemristorController.Stopwatch.Restart();
-        timePassed = 0;
-        n = 0;
-        GraphLineId = 2;
-    }
-
-    private void InitPhase3()
-    {
-        SetState(PulseUtility.PulseType.Erase);
-        MemristorController.Stopwatch.Restart();
-        timePassed = 0;
-        n = 0;
-        GraphLineId = 0;
-    }
-
-   
 }

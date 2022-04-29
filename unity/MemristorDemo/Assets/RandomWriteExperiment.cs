@@ -66,21 +66,24 @@ public class RandomWriteExperiment : MonoBehaviour
 
     public void Update()
     {
-        //we only need this update to poll if experiment ended. This can be refactored to somehting better
-        //check Output queue, if something process one per frame
-        if (MemristorController.Output.Count > 0)
+        if (ExperimentManager.experiment == ExperimentManager.Experiments.RandomWrite)
         {
-            string result = "";
-            MemristorController.Output.TryDequeue(out result);
-            var parts = result.Split(',');
-            actualStates.Add(int.Parse(parts[1]));
-        }
+            //we only need this update to poll if experiment ended. This can be refactored to somehting better
+            //check Output queue, if something process one per frame
+            if (MemristorController.Output.Count > 0)
+            {
+                string result = "";
+                MemristorController.Output.TryDequeue(out result);
+                var parts = result.Split(',');
+                actualStates.Add(int.Parse(parts[1]));
+            }
 
-        if ((actualStates.Count == (N*3))&& once)
-        {
-            cm.UpdateMatrix(groundTruthStates, actualStates);
-            once = false;
-            Scheduler.IsActive = false;
+            if ((actualStates.Count == (N * 3)) && once)
+            {
+                cm.UpdateMatrix(groundTruthStates, actualStates);
+                once = false;
+                Scheduler.IsActive = false;
+            }
         }
     }
 }
